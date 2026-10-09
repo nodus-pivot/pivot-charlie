@@ -198,9 +198,9 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-3rem)] lg:flex-row">
       {/* ---------------------------------------------------------------- queue */}
-      <aside className="flex w-full flex-none flex-col border-b border-rule bg-panel lg:w-[440px] lg:border-b-0 lg:border-r">
+      <aside className="flex w-full flex-none flex-col border-b border-rule bg-panel lg:min-h-0 lg:w-[440px] lg:border-b-0 lg:border-r">
         <div className="flex flex-col gap-3.5 px-5 pb-3.5 pt-9">
           <Eyebrow>Incoming · {brandName}</Eyebrow>
           <div className="flex items-baseline gap-3">
@@ -259,7 +259,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
         ) : null}
         {notice ? <p className="mx-5 mb-2 text-xs text-green">{notice}</p> : null}
 
-        <ul className="flex max-h-[40vh] flex-col overflow-y-auto lg:max-h-none lg:flex-1">
+        <ul className="flex max-h-[40vh] min-h-0 flex-col overflow-y-auto lg:max-h-none lg:flex-1">
           {shown.length === 0 ? <li className="px-5 py-8 text-sm text-ink-3">{rows.length ? "Nothing matches." : "The queue is empty."}</li> : null}
           {shown.map((r) => {
             const active = r.fingerprint === selectedFp;
@@ -297,7 +297,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
       </aside>
 
       {/* ---------------------------------------------------------------- review pane */}
-      <section className="flex min-w-0 flex-1 flex-col px-4 pb-8 pt-9 sm:px-8 lg:pl-[52px] lg:pr-12">
+      <section className="flex min-w-0 flex-1 flex-col px-4 pb-8 pt-9 sm:px-8 lg:min-h-0 lg:overflow-y-auto lg:pl-[52px] lg:pr-12">
         {!selected || !draft ? (
           <p className="text-sm text-ink-3">Pick a row on the left to review it.</p>
         ) : (
