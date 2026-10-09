@@ -72,12 +72,12 @@ export function UserMenu({ chip, canViewAs, viewingAs, workspaces, brands }: Pro
         aria-expanded={open}
         aria-haspopup="menu"
         className={cn(
-          "flex items-center gap-2 text-xs uppercase tracking-label transition-colors",
+          "flex max-w-[44vw] items-center gap-2 whitespace-nowrap text-xs uppercase tracking-label transition-colors sm:max-w-none",
           viewingAs ? "text-amber" : "text-ink-3 hover:text-ink-2",
         )}
       >
-        {chip}
-        <CaretDown size={12} aria-hidden />
+        <span className="truncate">{chip}</span>
+        <CaretDown size={12} aria-hidden className="shrink-0" />
       </button>
 
       {open ? (

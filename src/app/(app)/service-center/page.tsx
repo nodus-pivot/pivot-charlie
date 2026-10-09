@@ -1,30 +1,56 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { PageBand } from "@/components/layout/page-band";
 import { ButtonLink } from "@/components/ui/button";
 import { getCurrentUser } from "@/features/auth/queries";
+import { SIGN_IN_PATH } from "@/features/auth/redirect";
+import { buildBench, type BenchFilter, type BenchSort } from "@/features/tickets/bench";
+import { BenchView } from "@/features/tickets/components/bench";
+import { listBench } from "@/features/tickets/queries";
 import { getWorkspaceContext } from "@/features/workspaces/queries";
 
 export const metadata: Metadata = { title: "My bench" };
 
-/** S1 arrives next round; this is the band and an empty body so the shell can be seen. */
-export default async function ServiceCenterPage() {
-  const [user, ws] = await Promise.all([getCurrentUser(), getWorkspaceContext()]);
-  const first = user?.profile.display_name.split(/\s+/)[0] ?? "";
+const FILTERS: BenchFilter[] = ["all", "needs_me", "waiting", "priority", "over_14"];
+
+function one(v: string | string[] | undefined): string {
+  return Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
+}
+
+/** S1: stats, tabs, filters, Needs attention pinned, then the bench by step. */
+export default async function ServiceCenterPage({ searchParams }: PageProps<"/service-center">) {
+  const [user, ws, sp] = await Promise.all([getCurrentUser(), getWorkspaceContext(), searchParams]);
+  if (!user) redirect(SIGN_IN_PATH);
+  if (!ws.current) {
+    return (
+      <>
+        <PageBand eyebrow="Pivot" title="No workspace" />
+        <p className="px-12 py-7 text-sm text-ink-3">Your account has no workspace yet. Ask an owner.</p>
+      </>
+    );
+  }
+
+  const view = one(sp.view) === "closed" ? "closed" : "open";
+  const filter = (FILTERS.find((f) => f === one(sp.filter)) ?? "all") as BenchFilter;
+  const sort: BenchSort = one(sp.sort) === "newest" ? "newest" : "oldest";
+  const query = one(sp.q).trim();
+
+  const rows = await listBench(ws.current.id, view);
+  const bench = buildBench(rows, user.grants, { filter: view === "closed" ? "all" : filter, sort, query });
+  const first = user.profile.display_name.split(/\s+/)[0] ?? "";
 
   return (
     <>
       <PageBand
-        eyebrow={[ws.current?.name, first].filter(Boolean).join(" · ")}
-        title="My bench"
+        eyebrow={`${ws.current.name} · ${first}`}
+        title={view === "closed" ? "Closed" : "My bench"}
         action={
           <ButtonLink href="/service-center/tickets/new" variant="primary">
             New ticket
           </ButtonLink>
         }
       />
-      <section className="px-4 py-7 sm:px-8 lg:px-12">
-        <p className="text-sm text-ink-3">The bench list is the next screen to be built.</p>
-      </section>
+      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} incomingCount={null} />
     </>
   );
 }

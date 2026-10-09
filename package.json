@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:types": "supabase gen types typescript --linked --schema public > src/lib/supabase/database.types.ts",
     "db:push": "supabase db push",
-    "db:seed": "python3 supabase/seed.py > supabase/seed.sql && supabase db query --linked --file supabase/seed.sql"
+    "db:seed": "python3 supabase/seed.py > supabase/seed.sql && supabase db query --linked --file supabase/seed.sql",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

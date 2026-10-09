@@ -22,7 +22,7 @@ export function NavLinks({ showOps }: { showOps: boolean }) {
             href={l.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "border-b pb-0.5 transition-colors",
+              "whitespace-nowrap border-b pb-0.5 transition-colors",
               active ? "border-gold text-ink" : "border-transparent text-ink-3 hover:text-ink-2",
             )}
           >
