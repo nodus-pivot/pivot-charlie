@@ -7,7 +7,8 @@ import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { buildBench, type BenchFilter, type BenchSort } from "@/features/tickets/bench";
 import { BenchView } from "@/features/tickets/components/bench";
 import { listBench } from "@/features/tickets/queries";
-import { getWorkspaceContext } from "@/features/workspaces/queries";
+import { countIncoming } from "@/features/intake/queries";
+import { getVisibleBrands, getWorkspaceContext } from "@/features/workspaces/queries";
 
 export const metadata: Metadata = { title: "My bench" };
 
@@ -35,7 +36,9 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
   const sort: BenchSort = one(sp.sort) === "newest" ? "newest" : "oldest";
   const query = one(sp.q).trim();
 
-  const rows = await listBench(ws.current.id, view);
+  const brands = await getVisibleBrands();
+  const brand = brands.find((b) => b.workspace_id === ws.current!.id);
+  const [rows, incomingCount] = await Promise.all([listBench(ws.current.id, view), brand ? countIncoming(ws.current.id, brand.id) : Promise.resolve(null)]);
   const bench = buildBench(rows, user.grants, { filter: view === "closed" ? "all" : filter, sort, query });
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
 
@@ -50,7 +53,7 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
           </ButtonLink>
         }
       />
-      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} incomingCount={null} />
+      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} incomingCount={incomingCount} />
     </>
   );
 }

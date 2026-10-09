@@ -1039,6 +1039,13 @@ export type Database = {
         Args: { p_display_name: string; p_is_active: boolean; p_user: string }
         Returns: undefined
       }
+      create_ticket: {
+        Args: { p: Json }
+        Returns: {
+          id: string
+          number: string
+        }[]
+      }
       my_real_grants: {
         Args: never
         Returns: {
