@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pivot Charlie
 
-## Getting Started
+Nodus Watches' repair ticketing, second demo. Next.js 16 + Supabase. New tickets arrive from the
+Google Sheet "Nodus Warranty Claims" (Incoming Watches tab); accepting one moves the row to the
+current month tab and creates the ticket here.
 
-First, run the development server:
+## Local setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. `npm install` (Node 24+; on this Mac `export PATH=/opt/homebrew/bin:$PATH`).
+2. `.env.local` holds the Supabase URL and keys, the Google service-account key (base64 JSON) and
+   the sheet ID. Ask an owner for a copy; it is never committed.
+3. `npx supabase link --project-ref vmzypgrryjspytnxhipm` once, then:
+   - `npm run db:push` applies migrations in `supabase/migrations`.
+   - `npm run db:seed` regenerates `supabase/seed.sql` from `supabase/seed.py` and applies it.
+     Re-run any time to reset the demo tickets and demo people; tickets created in the app are kept.
+   - `npm run db:types` regenerates `src/lib/supabase/database.types.ts`. Run it after every
+     migration and commit the result.
+4. `npm run dev`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Demo sign-ins
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Every demo account uses the password `PivotDemo2026!!` (the seed resets it).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Email | Role |
+|---|---|
+| owner.demo@pivot.test | owner (Wes) |
+| cullen.demo@pivot.test | owner (Cullen) |
+| rane.demo@pivot.test | watchmaker, Nodus |
+| nodus.rep.demo@pivot.test | brand rep, Nodus |
 
-## Learn More
+## Deploys
 
-To learn more about Next.js, take a look at the following resources:
+Pushes to `main` deploy to Vercel (project `pivot-charlie`). Preview deployments get the same
+environment variables.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Google Sheet
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app acts as the service account `pivot-charlie@pivot-charlie-nodus.iam.gserviceaccount.com`,
+which must be an Editor on the sheet. Pivot reads Incoming Watches, moves accepted rows to the
+`MMM YYYY` tab (creating it if missing) and dismissed rows to `Archive`, and writes back only the
+month row's Solution, Payment Received?, Repair Completed? and Shipped Back? cells.
