@@ -211,7 +211,8 @@ TICKETS = [
          ship_to=addr("21 Hampshire Rd", "Midland Park", "NJ", "07432"),
          findings=[("dial", "scratched", "replace", "DL-SGMT-01", dict(requested=7)),
                    ("crown", "worn", "replace", "CR-NW-01", dict(have_it=True))],
-         message=("Need 1× Dial, Sector GMT DL-SGMT-01 for NW260003", 7)),
+         spares=[("CT-NW-01", "Spare casetube", dict(requested=7, arrived=3))],
+         message=("Need 1× Dial, Sector GMT DL-SGMT-01 and a spare casetube CT-NW-01 for NW260003", 7)),
     dict(n=4, name="Adam Ferguson", email="adam@example.com", phone="(213) 555-0144", watch=CT, stage="fix", age=12,
          priority=True, coverage="warranty", serial="504004",
          issue="Bezel doesn't click and rotates freely. Deep scratch on the case at 4 o'clock.", ship_to=LA,
@@ -234,7 +235,7 @@ TICKETS = [
          serial="504018", issue="Lume barely glows on the hour markers.", ship_to=addr("9337 Hillside Dr", "Champlin", "MN", "55316"),
          findings=[("dial", "discolored", "replace", "DL-CT-01", dict(have_it=True, done=38))],
          tests=[(1, "time", "pass"), (1, "water", "pass"), (1, "looks", "pass")],
-         shipment=dict(carrier="usps", tracking="9400 1108 4007 2231 0001", shipped=36)),
+         bench_minutes=95, shipment=dict(carrier="usps", tracking="9400 1108 4007 2231 0001", shipped=36)),
     dict(n=8, name="Tom Reyes", email="tom@example.com", watch=SGMT, stage="closed", age=50, closed=44, coverage="paid",
          needs_payment=True, payment_amount=55, payment_received=True,
          serial="5030761", issue="Clasp would not stay closed. Out of warranty.", ship_to=addr("7218 Murray Lane", "Annandale", "VA", "22003"),
@@ -242,13 +243,13 @@ TICKETS = [
          tests=[(1, "time", "pass"), (1, "water", "pass"), (1, "looks", "fail"),
                 (2, "time", "pass"), (2, "water", "pass"), (2, "looks", "pass")],
          sent_back=47,
-         shipment=dict(carrier="ups", tracking="1Z 999 AA1 01 2345 6784", shipped=44)),
+         bench_minutes=40, shipment=dict(carrier="ups", tracking="1Z 999 AA1 01 2345 6784", signature=True, shipped=44)),
     dict(n=9, name="Owen Brooks", email="owen@example.com", watch=TT, stage="check_in", age=2, return_to_everett=True,
          serial="1292", issue="New watch arrived with a divot in the bezel near 10. Customer is returning it.",
          ship_to=addr("35475 Marabella Ct", "Winchester", "CA", "92596")),
 ]
 
-ticket_rows, finding_rows, test_rows, ship_rows, event_rows = [], [], [], [], []
+ticket_rows, finding_rows, test_rows, ship_rows, event_rows, supply_rows, spare_rows = [], [], [], [], [], [], []
 eid = 4300
 fid = 4100
 xid = 4500
@@ -268,11 +269,11 @@ for t in TICKETS:
         f"  ({q(uid(tid))}, {q(number)}, {q(WS)}, {q(NODUS)}, {q(uid(t['watch']))}, {q(stage)}, {q(t.get('source', 'by_hand'))}, {q(t.get('claim'))}, "
         f"{q(REP)}, {q(t['name'])}, {q(t['email'])}, {q(t.get('phone'))}, {q(t['ship_to'])}, {q(NAME[t['watch']])}, {q(t.get('serial'))}, {q(t['issue'])}, "
         f"{q(t.get('coverage'))}, {q(t.get('priority', False))}, {q(t.get('needs_payment', False))}, {q(t.get('payment_amount'))}, {q(t.get('payment_received', False))}, {q(t.get('return_to_everett', False))}, "
-        f"{days(age) if received else 'null'}, {max(a for a, *_ in t.get('tests', [(1,)]))}, {days(closed_age) if closed_age else 'null'}, {days(age)}, {days(max(age - 3 * reached, 0.5))})"
+        f"{days(age) if received else 'null'}, {max(a for a, *_ in t.get('tests', [(1,)]))}, {q(t.get('bench_minutes'))}, {days(closed_age) if closed_age else 'null'}, {days(age)}, {days(max(age - 3 * reached, 0.5))})"
     )
     # timeline: created, then one stage_changed per step reached, evenly spaced
     eid += 1
-    event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'created', {q(REP)}, null, 'check_in', null, {days(age)})")
+    event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'created', {q(REP)}, null, 'check_in', null, {days(age)}, null)")
     span = age - (closed_age or 0.5)
     for i in range(1, reached + 1):
         at = age - span * i / (reached + (0 if stage == 'closed' else 1))
@@ -280,27 +281,41 @@ for t in TICKETS:
         if t.get("sent_back") and PATH[i] == "ship":
             # a failed test round trip before the final pass
             eid += 1
-            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'sent_back', {q(RANE)}, 'test', 'fix', 'Looks failed: smudge under the crystal', {days(t['sent_back'])})")
+            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'sent_back', {q(RANE)}, 'test', 'fix', 'Looks failed: smudge under the crystal', {days(t['sent_back'])}, null)")
             eid += 1
-            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'stage_changed', {q(RANE)}, 'fix', 'test', null, {days(t['sent_back'] - 1)})")
+            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'stage_changed', {q(RANE)}, 'fix', 'test', null, {days(t['sent_back'] - 1)}, null)")
         eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'stage_changed', {q(actor)}, {q(PATH[i - 1])}, {q(PATH[i])}, null, {days(at)})")
+        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'stage_changed', {q(actor)}, {q(PATH[i - 1])}, {q(PATH[i])}, null, {days(at)}, null)")
     if t.get("message"):
         body, when = t["message"]
         eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'parts_requested', {q(RANE)}, null, null, {q(body)}, {days(when)})")
+        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'parts_requested', {q(RANE)}, null, null, {q(body)}, {days(when)}, null)")
     for actor, when, body in t.get("comments", []):
         eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'comment', {q(actor)}, null, null, {q(body)}, {days(when)})")
-    if stage == "closed":
-        eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'email_logged', {q(RANE)}, null, null, 'On its way', {days(closed_age)})")
+        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'comment', {q(actor)}, null, null, {q(body)}, {days(when)}, null)")
+    EMAILS = {"inspect": ("request_received", "Request received"), "fix": ("repair_in_progress", "Repair in progress"),
+              "test": ("testing", "Testing"), "closed": ("on_its_way", "On its way")}
+    for i in range(1, reached + 1):
+        if PATH[i] in EMAILS:
+            template, subject = EMAILS[PATH[i]]
+            at = age - span * i / (reached + (0 if stage == 'closed' else 1))
+            eid += 1
+            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'email_logged', {q(RANE if PATH[i] != 'inspect' else REP)}, null, null, {q(subject)}, {days(at)}, {q({'template': template})})")
     for comp, cond, action, sku, extra in t.get("findings", []):
         fid += 1
         finding_rows.append(
             f"  ({q(uid(fid))}, {q(uid(tid))}, {q(comp)}, {q(cond)}, {q(action)}, {q(PART_ID[sku]) if sku else 'null'}, 'inspect', "
-            f"{q(extra.get('have_it', False))}, {days(extra['requested']) if 'requested' in extra else 'null'}, {days(extra['arrived']) if 'arrived' in extra else 'null'}, "
             f"{days(extra['done']) if 'done' in extra else 'null'}, {q(RANE) if 'done' in extra else 'null'}, {q(RANE)})"
+        )
+        if action == "replace" and sku and any(k in extra for k in ("have_it", "requested", "arrived")):
+            supply_rows.append(
+                f"update ticket_parts set have_it = {q(extra.get('have_it', False))}, requested_at = {days(extra['requested']) if 'requested' in extra else 'null'}, "
+                f"arrived_at = {days(extra['arrived']) if 'arrived' in extra else 'null'} where finding_id = {q(uid(fid))};"
+            )
+    for sku, label, extra in t.get("spares", []):
+        spare_rows.append(
+            f"  ({q(uid(tid))}, null, {q(PART_ID[sku])}, {q(label)}, {q(extra.get('have_it', False))}, "
+            f"{days(extra['requested']) if 'requested' in extra else 'null'}, {days(extra['arrived']) if 'arrived' in extra else 'null'}, {q(RANE)})"
         )
     for attempt, kind, result in t.get("tests", []):
         xid += 1
@@ -309,7 +324,7 @@ for t in TICKETS:
         s = t["shipment"]
         sid += 1
         ship_rows.append(
-            f"  ({q(uid(sid))}, {q(uid(tid))}, {q(s.get('carrier'))}, {q(s.get('tracking'))}, false, true, {q(t['ship_to'])}, "
+            f"  ({q(uid(sid))}, {q(uid(tid))}, {q(s.get('carrier'))}, {q(s.get('tracking'))}, false, true, {q(s.get('signature', False))}, {q(t['ship_to'])}, "
             f"{days(s['shipped']) if 'shipped' in s else 'null'}, {q(RANE)})"
         )
 
@@ -318,20 +333,27 @@ emit("-- The bench from the mocks: one ticket per stage plus closed ones. Reset 
 emit("-- tickets created through the app keep their own ids and are never touched.")
 emit(f"delete from tickets where id in ({', '.join(q(uid(t)) for t in ticket_ids)});")
 emit("alter table tickets disable trigger tickets_updated_at;")
-emit("insert into tickets (id, number, workspace_id, brand_id, watch_id, stage, source, claim_ref, created_by, customer_name, customer_email, customer_phone, ship_to, customer_model_text, serial, issue, coverage, priority, needs_payment, payment_amount, payment_received, return_to_everett, received_at, test_attempt, closed_at, created_at, updated_at) values")
+emit("insert into tickets (id, number, workspace_id, brand_id, watch_id, stage, source, claim_ref, created_by, customer_name, customer_email, customer_phone, ship_to, customer_model_text, serial, issue, coverage, priority, needs_payment, payment_amount, payment_received, return_to_everett, received_at, test_attempt, bench_minutes, closed_at, created_at, updated_at) values")
 emit(",\n".join(ticket_rows) + ";")
 emit("alter table tickets enable trigger tickets_updated_at;")
 emit()
-emit("insert into ticket_events (id, ticket_id, type, actor_id, from_stage, to_stage, body, created_at) values")
+emit("insert into ticket_events (id, ticket_id, type, actor_id, from_stage, to_stage, body, created_at, payload) values")
 emit(",\n".join(event_rows) + ";")
 emit()
-emit("insert into ticket_findings (id, ticket_id, component, condition, action, part_id, found_at_stage, have_it, requested_at, arrived_at, done_at, done_by, created_by) values")
+emit("-- Inserting a Replace finding creates its ticket_parts row (trigger); supply state is set after.")
+emit("insert into ticket_findings (id, ticket_id, component, condition, action, part_id, found_at_stage, done_at, done_by, created_by) values")
 emit(",\n".join(finding_rows) + ";")
+emit("\n".join(supply_rows))
 emit()
+if spare_rows:
+    emit("-- Extra parts the watchmaker asked for beyond the findings.")
+    emit("insert into ticket_parts (ticket_id, finding_id, part_id, label, have_it, requested_at, arrived_at, created_by) values")
+    emit(",\n".join(spare_rows) + ";")
+    emit()
 emit("insert into ticket_tests (id, ticket_id, attempt, kind, result, created_by, created_at) values")
 emit(",\n".join(test_rows) + ";")
 emit()
-emit("insert into shipments (id, ticket_id, carrier, tracking, handed_over, email_customer, ship_to, shipped_at, created_by) values")
+emit("insert into shipments (id, ticket_id, carrier, tracking, handed_over, email_customer, signature_required, ship_to, shipped_at, created_by) values")
 emit(",\n".join(ship_rows) + ";")
 emit()
 print("\n".join(out))

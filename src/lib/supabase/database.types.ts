@@ -310,6 +310,7 @@ export type Database = {
           id: string
           ship_to: Json | null
           shipped_at: string | null
+          signature_required: boolean
           ticket_id: string
           tracking: string | null
           updated_at: string
@@ -323,6 +324,7 @@ export type Database = {
           id?: string
           ship_to?: Json | null
           shipped_at?: string | null
+          signature_required?: boolean
           ticket_id: string
           tracking?: string | null
           updated_at?: string
@@ -336,6 +338,7 @@ export type Database = {
           id?: string
           ship_to?: Json | null
           shipped_at?: string | null
+          signature_required?: boolean
           ticket_id?: string
           tracking?: string | null
           updated_at?: string
@@ -425,7 +428,6 @@ export type Database = {
       ticket_findings: {
         Row: {
           action: Database["public"]["Enums"]["finding_action"]
-          arrived_at: string | null
           component: Database["public"]["Enums"]["component"]
           condition: Database["public"]["Enums"]["finding_condition"] | null
           created_at: string
@@ -433,17 +435,14 @@ export type Database = {
           done_at: string | null
           done_by: string | null
           found_at_stage: Database["public"]["Enums"]["stage"]
-          have_it: boolean
           id: string
           note: string | null
           part_id: string | null
-          requested_at: string | null
           ticket_id: string
           updated_at: string
         }
         Insert: {
           action?: Database["public"]["Enums"]["finding_action"]
-          arrived_at?: string | null
           component: Database["public"]["Enums"]["component"]
           condition?: Database["public"]["Enums"]["finding_condition"] | null
           created_at?: string
@@ -451,17 +450,14 @@ export type Database = {
           done_at?: string | null
           done_by?: string | null
           found_at_stage?: Database["public"]["Enums"]["stage"]
-          have_it?: boolean
           id?: string
           note?: string | null
           part_id?: string | null
-          requested_at?: string | null
           ticket_id: string
           updated_at?: string
         }
         Update: {
           action?: Database["public"]["Enums"]["finding_action"]
-          arrived_at?: string | null
           component?: Database["public"]["Enums"]["component"]
           condition?: Database["public"]["Enums"]["finding_condition"] | null
           created_at?: string
@@ -469,11 +465,9 @@ export type Database = {
           done_at?: string | null
           done_by?: string | null
           found_at_stage?: Database["public"]["Enums"]["stage"]
-          have_it?: boolean
           id?: string
           note?: string | null
           part_id?: string | null
-          requested_at?: string | null
           ticket_id?: string
           updated_at?: string
         }
@@ -508,6 +502,90 @@ export type Database = {
           },
           {
             foreignKeyName: "ticket_findings_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_parts: {
+        Row: {
+          arrived_at: string | null
+          created_at: string
+          created_by: string | null
+          finding_id: string | null
+          have_it: boolean
+          id: string
+          label: string | null
+          note: string | null
+          part_id: string
+          qty: number
+          requested_at: string | null
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          arrived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          finding_id?: string | null
+          have_it?: boolean
+          id?: string
+          label?: string | null
+          note?: string | null
+          part_id: string
+          qty?: number
+          requested_at?: string | null
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          arrived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          finding_id?: string | null
+          have_it?: boolean
+          id?: string
+          label?: string | null
+          note?: string | null
+          part_id?: string
+          qty?: number
+          requested_at?: string | null
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_parts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_parts_finding_id_fkey"
+            columns: ["finding_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_parts_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_parts_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_parts_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "tickets"
@@ -624,6 +702,7 @@ export type Database = {
       }
       tickets: {
         Row: {
+          bench_minutes: number | null
           bench_note: string | null
           brand_id: string
           claim_ref: string | null
@@ -660,6 +739,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          bench_minutes?: number | null
           bench_note?: string | null
           brand_id: string
           claim_ref?: string | null
@@ -696,6 +776,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          bench_minutes?: number | null
           bench_note?: string | null
           brand_id?: string
           claim_ref?: string | null
@@ -911,12 +992,12 @@ export type Database = {
           needs_payment: boolean | null
           number: string | null
           parked: boolean | null
+          parts_in_hand: number | null
           parts_requested_at: string | null
+          parts_total: number | null
           payment_received: boolean | null
           priority: boolean | null
           received_at: string | null
-          replace_in_hand: number | null
-          replace_total: number | null
           return_to_everett: boolean | null
           ship_ready: boolean | null
           source: Database["public"]["Enums"]["ticket_source"] | null
@@ -988,6 +1069,8 @@ export type Database = {
         | "gaskets"
         | "strap"
         | "clasp"
+        | "caseback"
+        | "lume"
       coverage: "warranty" | "paid"
       finding_action: "fix" | "replace"
       finding_condition: "worn" | "scratched" | "discolored" | "cracked"
@@ -1144,6 +1227,8 @@ export const Constants = {
         "gaskets",
         "strap",
         "clasp",
+        "caseback",
+        "lume",
       ],
       coverage: ["warranty", "paid"],
       finding_action: ["fix", "replace"],
