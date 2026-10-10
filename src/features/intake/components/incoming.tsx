@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, ArrowsClockwise, CurrencyDollar, GoogleLogo, Info, Lightning, LockSimple, MagnifyingGlass, ArrowUUpLeft } from "@phosphor-icons/react";
+import { useMemo, useState, useTransition } from "react";
+import { ArrowLeft, ArrowsClockwise, CurrencyDollar, GoogleLogo, LockSimple, MagnifyingGlass, ArrowUUpLeft } from "@phosphor-icons/react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
-import { Segmented, ToggleChip } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
-import { createTicket, dismissRow, refreshIncoming, retryMoves } from "../actions";
+import { dismissRow, refreshIncoming, retryMoves } from "../actions";
 import type { CatalogWatch, IncomingRow } from "../sheet";
+import { TicketForm, draftFromRow, type Draft } from "./ticket-form";
 
 type Props = {
   rows: IncomingRow[];
@@ -25,59 +25,6 @@ type Props = {
 };
 
 type Filter = "all" | "missing" | "payment" | "model";
-type Draft = {
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  line1: string;
-  line2: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  watchId: string;
-  serial: string;
-  coverage: "warranty" | "paid" | null;
-  priority: boolean;
-  needsPayment: boolean;
-  paymentAmount: string;
-  returnToEverett: boolean;
-  issue: string;
-  benchNote: string;
-};
-
-function draftFor(r: IncomingRow): Draft {
-  return {
-    customerName: r.name,
-    customerEmail: r.email,
-    customerPhone: "",
-    line1: r.address.line1,
-    line2: r.address.line2,
-    city: r.address.city,
-    state: r.address.state,
-    postal_code: r.address.postal_code,
-    country: r.address.country,
-    watchId: r.model.kind === "none" ? "" : r.model.watch.id,
-    serial: r.fields.serial,
-    coverage: r.needsPayment ? "paid" : "warranty",
-    priority: /priority/i.test(r.issue),
-    needsPayment: r.needsPayment,
-    paymentAmount: r.paymentAmount?.toString() ?? "",
-    returnToEverett: r.returnToEverett,
-    issue: r.issue,
-    benchNote: "",
-  };
-}
-
-function missingFor(d: Draft): string[] {
-  const m: string[] = [];
-  if (!d.customerName.trim()) m.push("name");
-  if (!/\S+@\S+\.\S+/.test(d.customerEmail)) m.push("email");
-  if (!d.watchId) m.push("pick a catalog model");
-  if (!d.issue.trim()) m.push("what they said");
-  return m;
-}
-
 const timeFmt = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
 
 export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stale, pendingMoves, monthTab, initialSelected }: Props) {
@@ -117,51 +64,10 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
   }, [rows, filter, query, sort]);
 
   const selected = rows.find((r) => r.fingerprint === selectedFp) ?? null;
-  const draft = selected ? (drafts[selected.fingerprint] ?? draftFor(selected)) : null;
+  const draft = selected ? (drafts[selected.fingerprint] ?? draftFromRow(selected)) : null;
   function patch(p: Partial<Draft>) {
     if (!selected || !draft) return;
     setDrafts((d) => ({ ...d, [selected.fingerprint]: { ...draft, ...p } }));
-  }
-
-  const watch = catalog.find((w) => w.id === draft?.watchId) ?? null;
-  const missing = draft ? missingFor(draft) : [];
-
-  function submitCreate() {
-    if (!selected || !draft) return;
-    setError(null);
-    start(async () => {
-      let r: Awaited<ReturnType<typeof createTicket>>;
-      try {
-        r = await createTicket({
-        brandId,
-        watchId: draft.watchId,
-        customerName: draft.customerName,
-        customerEmail: draft.customerEmail,
-        customerPhone: draft.customerPhone,
-        shipTo: { line1: draft.line1, line2: draft.line2, city: draft.city, state: draft.state, postal_code: draft.postal_code, country: draft.country },
-        modelText: selected.fields.model,
-        serial: draft.serial,
-        issue: draft.issue,
-        benchNote: draft.benchNote,
-        coverage: draft.coverage,
-        priority: draft.priority,
-        needsPayment: draft.needsPayment,
-        paymentAmount: draft.paymentAmount ? Number(draft.paymentAmount) : null,
-        returnToEverett: draft.returnToEverett,
-        onBench: false,
-        claimRef: selected.claimRef,
-        sheet: { fingerprint: selected.fingerprint, raw: selected.raw },
-        });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong.");
-        return;
-      }
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-      router.push(`/service-center/tickets/${r.number}${r.moveError ? "?move=failed" : ""}`);
-    });
   }
 
   function retryPending() {
@@ -264,6 +170,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
           </div>
         ) : null}
         {notice ? <p className="mx-5 mb-2 text-xs text-green">{notice}</p> : null}
+        {error ? <p role="alert" className="mx-5 mb-2 text-xs text-coral">{error}</p> : null}
 
         <ul className="flex max-h-[40vh] min-h-0 flex-col overflow-y-auto lg:max-h-none lg:flex-1">
           {shown.length === 0 ? <li className="px-5 py-8 text-sm text-ink-3">{rows.length ? "Nothing matches." : "The queue is empty."}</li> : null}
@@ -343,135 +250,12 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
               </p>
             </div>
 
-            <div className="mt-7 grid gap-x-14 lg:grid-cols-2">
-              <div>
-                <FieldRow label="Customer" source="Name">
-                  <TextInput value={draft.customerName} onChange={(v) => patch({ customerName: v })} placeholder="Full name" />
-                </FieldRow>
-                <FieldRow label="Email" source="Email">
-                  <TextInput value={draft.customerEmail} onChange={(v) => patch({ customerEmail: v })} placeholder="Missing on the form" type="email" />
-                </FieldRow>
-                <FieldRow label="Phone">
-                  <TextInput value={draft.customerPhone} onChange={(v) => patch({ customerPhone: v })} placeholder="Not on the form" />
-                </FieldRow>
-                <FieldRow label="Ship to" source="Address · City · State · Zip · Country">
-                  <div className="grid gap-2">
-                    <TextInput value={draft.line1} onChange={(v) => patch({ line1: v })} placeholder="Street" />
-                    <TextInput value={draft.line2} onChange={(v) => patch({ line2: v })} placeholder="Apt, suite (optional)" />
-                    <div className="grid grid-cols-[1fr_72px_96px_64px] gap-2">
-                      <TextInput value={draft.city} onChange={(v) => patch({ city: v })} placeholder="City" />
-                      <TextInput value={draft.state} onChange={(v) => patch({ state: v })} placeholder="State" />
-                      <TextInput value={draft.postal_code} onChange={(v) => patch({ postal_code: v })} placeholder="Zip" />
-                      <TextInput value={draft.country} onChange={(v) => patch({ country: v })} placeholder="US" />
-                    </div>
-                  </div>
-                </FieldRow>
-              </div>
-              <div>
-                <FieldRow
-                  label="Watch"
-                  source="Model"
-                  trailing={selected.model.kind === "none" ? <Chip tone="amber">Not in catalog</Chip> : selected.model.kind === "fuzzy" ? <Chip tone="amber">Best guess</Chip> : <Chip tone="green">In catalog</Chip>}
-                >
-                  <span className="flex flex-wrap items-center gap-2.5 text-[17px] text-ink">
-                    <span className="truncate">{selected.fields.model || "—"}</span>
-                    <ArrowRight size={14} className="text-ink-3" aria-hidden />
-                    <select
-                      value={draft.watchId}
-                      onChange={(e) => patch({ watchId: e.target.value })}
-                      className={cn("bg-transparent text-[17px] outline-none [&>option]:bg-panel", draft.watchId ? "text-ink" : "text-gold-light")}
-                      aria-label="Catalog model"
-                    >
-                      <option value="">Pick a model ▾</option>
-                      {catalog.map((w) => (
-                        <option key={w.id} value={w.id}>{w.name}</option>
-                      ))}
-                    </select>
-                  </span>
-                </FieldRow>
-                <FieldRow label="Serial" source="Serial Number">
-                  <TextInput value={draft.serial} onChange={(v) => patch({ serial: v })} placeholder="Optional" mono />
-                </FieldRow>
-                <FieldRow label="Coverage" trailing={<Segmented value={draft.coverage} options={[{ value: "warranty", label: "Warranty" }, { value: "paid", label: "Paid" }]} onChange={(v) => patch({ coverage: v, needsPayment: v === "paid" ? true : draft.needsPayment })} aria-label="Coverage" />}>
-                  <span className="text-[17px] text-ink">
-                    {draft.coverage === "paid" ? "Paid repair" : "Warranty"}
-                    {draft.coverage !== "paid" && watch?.warranty_months ? ` · ${watch.warranty_months} mo` : ""}
-                  </span>
-                  <span className="text-xs text-ink-3">
-                    Sheet says Payment Required = {selected.fields.paymentRequired || "blank"}
-                    {selected.paymentAmount !== null ? ` · $${selected.paymentAmount} in the issue text` : ""}
-                  </span>
-                </FieldRow>
-                <FieldRow label="Flags">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <ToggleChip on={draft.priority} onChange={(v) => patch({ priority: v })} tone="coral"><Lightning size={11} /> Priority</ToggleChip>
-                    <ToggleChip on={draft.needsPayment} onChange={(v) => patch({ needsPayment: v })}><CurrencyDollar size={11} /> Needs payment</ToggleChip>
-                    {draft.needsPayment ? (
-                      <input value={draft.paymentAmount} onChange={(e) => patch({ paymentAmount: e.target.value.replace(/[^\d.]/g, "") })} placeholder="$" inputMode="decimal" className="h-7 w-20 border-b border-border-strong bg-transparent font-mono text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none" aria-label="Amount" />
-                    ) : null}
-                    <ToggleChip on={draft.returnToEverett} onChange={(v) => patch({ returnToEverett: v })}><ArrowUUpLeft size={11} /> Return to Everett</ToggleChip>
-                  </span>
-                </FieldRow>
-              </div>
-            </div>
-
-            <FieldRow label="What the customer said" source="Issue">
-              <textarea value={draft.issue} onChange={(e) => patch({ issue: e.target.value })} rows={3} className="w-full resize-y bg-transparent text-[17px] leading-[1.45] text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none" placeholder="In their words" />
-              {selected.claimRef ? <span className="font-mono text-xs text-ink-3">Claim {selected.claimRef}</span> : null}
-            </FieldRow>
-            <FieldRow label="Note to the bench">
-              <textarea value={draft.benchNote} onChange={(e) => patch({ benchNote: e.target.value })} rows={2} className="w-full resize-y bg-transparent text-[17px] leading-[1.45] text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none" placeholder="Anything the watchmaker should know" />
-            </FieldRow>
-
-            <div className="mt-auto flex flex-col gap-3 pt-10">
-              {error ? <p role="alert" className="text-sm text-coral">{error}</p> : null}
-              <div className="flex flex-wrap items-center gap-4">
-                <Button variant="primary" disabled={pending || missing.length > 0} onClick={submitCreate}>
-                  {pending ? "Creating…" : "Create ticket"} <ArrowRight size={14} />
-                </Button>
-                {missing.length ? (
-                  <span className="text-[13px] text-ink-2">
-                    <span className="text-gold-light">{missing.length} left:</span> {missing.join(", ")}
-                  </span>
-                ) : (
-                  <span className="text-[13px] text-ink-2">Opens on Check in.</span>
-                )}
-              </div>
-              <p className="flex items-start gap-2 text-[13px] text-ink-3">
-                <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
-                <span>
-                  Creating moves the row from <span className="font-mono">Incoming Watches</span> to <span className="font-mono">{monthTab}</span> as it was, and opens the ticket on Check in. Your edits live only on the ticket.
-                </span>
-              </p>
+            <div className="mt-7 flex min-h-0 flex-1 flex-col">
+              <TicketForm draft={draft} onPatch={patch} catalog={catalog} brandId={brandId} context={{ kind: "sheet", row: selected, monthTab }} />
             </div>
           </>
         )}
       </section>
     </div>
-  );
-}
-
-function FieldRow({ label, source, trailing, children }: { label: string; source?: string; trailing?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2 border-t border-rule py-4">
-      <div className="flex items-center gap-2.5">
-        <span className="text-[11px] uppercase tracking-label text-ink-3">{label}</span>
-        {source ? <span className="font-mono text-[11px] text-ink-3">← {source}</span> : null}
-        {trailing ? <span className="ml-auto">{trailing}</span> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function TextInput({ value, onChange, placeholder, type = "text", mono }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string; mono?: boolean }) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={cn("w-full border-b border-transparent bg-transparent text-[17px] leading-[1.45] text-ink outline-none transition-colors placeholder:text-ink-3 hover:border-rule focus:border-gold focus-visible:outline-none", mono && "font-mono")}
-    />
   );
 }
