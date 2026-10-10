@@ -72,3 +72,13 @@ export async function listBench(workspaceId: string, view: "open" | "closed"): P
     tests_left: TEST_KINDS.filter((k) => !(passedBy.get(r.id!) ?? new Set()).has(k)),
   }));
 }
+
+/** Open and closed ticket counts for the Service Center tab strip. */
+export async function countTickets(workspaceId: string): Promise<{ open: number; closed: number }> {
+  const supabase = await createClient();
+  const [o, c] = await Promise.all([
+    supabase.from("tickets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("stage", "closed"),
+    supabase.from("tickets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("stage", "closed"),
+  ]);
+  return { open: o.count ?? 0, closed: c.count ?? 0 };
+}

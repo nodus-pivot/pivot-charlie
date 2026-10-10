@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Lightning, MagnifyingGlass, Package, Watch } from "@phosphor-icons/react/dist/ssr";
+import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
 import { Chip, ChipLink } from "@/components/ui/chip";
 import { buttonClasses } from "@/components/ui/button";
 import { STAGE_LABELS } from "@/features/pipeline";
@@ -13,7 +14,7 @@ type Props = {
   filter: BenchFilter;
   sort: BenchSort;
   query: string;
-  incomingCount: number | null;
+  counts: { bench: number | null; incoming: number | null; closed: number | null };
 };
 
 function href(params: Record<string, string | undefined>): string {
@@ -23,7 +24,7 @@ function href(params: Record<string, string | undefined>): string {
   return s ? `/service-center?${s}` : "/service-center";
 }
 
-export function BenchView({ bench, view, filter, sort, query, incomingCount }: Props) {
+export function BenchView({ bench, view, filter, sort, query, counts }: Props) {
   const { stats } = bench;
   const closed = view === "closed";
   return (
@@ -37,11 +38,7 @@ export function BenchView({ bench, view, filter, sort, query, incomingCount }: P
         </div>
       ) : null}
 
-      <nav className="flex gap-7 border-b border-rule text-sm" aria-label="Bench views">
-        <Tab href="/service-center" active={!closed} label="My bench" count={closed ? null : bench.total} />
-        <Tab href="/service-center/incoming" active={false} label="Incoming" count={incomingCount} />
-        <Tab href="/service-center?view=closed" active={closed} label="Closed" count={closed ? bench.total : null} />
-      </nav>
+      <ServiceCenterTabs active={closed ? "closed" : "bench"} counts={counts} />
 
       <div className="flex flex-wrap items-center gap-2">
         {!closed
@@ -107,19 +104,6 @@ function StatCard({ label, value, note, tone }: { label: string; value: number; 
       <span className={cn("font-display text-4xl leading-none font-semibold", tone === "amber" ? "text-amber" : tone === "coral" ? "text-coral" : "text-ink")}>{value}</span>
       <span className="truncate text-xs text-ink-3">{note}</span>
     </div>
-  );
-}
-
-function Tab({ href, active, label, count }: { href: string; active: boolean; label: string; count: number | null }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={cn("-mb-px flex items-center gap-2 border-b-2 py-3 transition-colors", active ? "border-gold font-medium text-ink" : "border-transparent text-ink-3 hover:text-ink-2")}
-    >
-      {label}
-      {count !== null ? <span className="font-mono text-[11px] text-ink-3">{count}</span> : null}
-    </Link>
   );
 }
 

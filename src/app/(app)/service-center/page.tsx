@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/features/auth/queries";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { buildBench, type BenchFilter, type BenchSort } from "@/features/tickets/bench";
 import { BenchView } from "@/features/tickets/components/bench";
-import { listBench } from "@/features/tickets/queries";
+import { countTickets, listBench } from "@/features/tickets/queries";
 import { countIncoming } from "@/features/intake/queries";
 import { getVisibleBrands, getWorkspaceContext } from "@/features/workspaces/queries";
 
@@ -38,7 +38,11 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
 
   const brands = await getVisibleBrands();
   const brand = brands.find((b) => b.workspace_id === ws.current!.id);
-  const [rows, incomingCount] = await Promise.all([listBench(ws.current.id, view), brand ? countIncoming(ws.current.id, brand.id) : Promise.resolve(null)]);
+  const [rows, incomingCount, totals] = await Promise.all([
+    listBench(ws.current.id, view),
+    brand ? countIncoming(ws.current.id, brand.id) : Promise.resolve(null),
+    countTickets(ws.current.id),
+  ]);
   const bench = buildBench(rows, user.grants, { filter: view === "closed" ? "all" : filter, sort, query });
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
 
@@ -53,7 +57,7 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
           </ButtonLink>
         }
       />
-      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} incomingCount={incomingCount} />
+      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} counts={{ bench: totals.open, incoming: incomingCount, closed: totals.closed }} />
     </>
   );
 }

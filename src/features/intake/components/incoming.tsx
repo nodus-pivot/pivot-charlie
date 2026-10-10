@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { ArrowRight, ArrowsClockwise, CurrencyDollar, GoogleLogo, Info, Lightning, LockSimple, MagnifyingGlass, ArrowUUpLeft } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, ArrowsClockwise, CurrencyDollar, GoogleLogo, Info, Lightning, LockSimple, MagnifyingGlass, ArrowUUpLeft } from "@phosphor-icons/react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -198,11 +199,16 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3rem)] lg:flex-none lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
       {/* ---------------------------------------------------------------- queue */}
       <aside className="flex w-full flex-none flex-col border-b border-rule bg-panel lg:min-h-0 lg:w-[440px] lg:border-b-0 lg:border-r">
-        <div className="flex flex-col gap-3.5 px-5 pb-3.5 pt-9">
-          <Eyebrow>Incoming · {brandName}</Eyebrow>
+        <div className="flex flex-col gap-3.5 px-5 pb-3.5 pt-7">
+          <div className="flex items-center justify-between gap-3">
+            <Eyebrow>Incoming · {brandName}</Eyebrow>
+            <Link href="/service-center" className="flex items-center gap-1.5 text-[11px] uppercase tracking-label text-ink-3 hover:text-ink-2">
+              <ArrowLeft size={12} aria-hidden /> My bench
+            </Link>
+          </div>
           <div className="flex items-baseline gap-3">
             <h1 className="font-display text-[34px] leading-none font-semibold tracking-[-0.02em] text-ink">Incoming watches</h1>
             <span className="font-mono text-[13px] text-ink-3">{rows.length}</span>

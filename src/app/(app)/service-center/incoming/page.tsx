@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { countTickets } from "@/features/tickets/queries";
 import { getCurrentUser } from "@/features/auth/queries";
 import { canIntake } from "@/features/auth/permissions";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
@@ -40,8 +42,11 @@ export default async function IncomingPage({ searchParams }: PageProps<"/service
     );
   }
 
+  const totals = await countTickets(ws.current.id);
   return (
-    <IncomingView
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3rem)] lg:flex-none">
+      <ServiceCenterTabs active="incoming" counts={{ bench: totals.open, incoming: queue.rows.length, closed: totals.closed }} className="flex-none px-4 sm:px-8 lg:px-12" />
+      <IncomingView
       rows={queue.rows}
       catalog={queue.catalog}
       brandId={brand.id}
@@ -51,6 +56,7 @@ export default async function IncomingPage({ searchParams }: PageProps<"/service
       pendingMoves={queue.pendingMoves}
       monthTab={monthTabTitle()}
       initialSelected={typeof sp.row === "string" ? sp.row : undefined}
-    />
+      />
+    </div>
   );
 }
