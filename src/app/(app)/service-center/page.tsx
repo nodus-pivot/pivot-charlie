@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PageBand } from "@/components/layout/page-band";
+import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
 import { ButtonLink } from "@/components/ui/button";
 import { getCurrentUser } from "@/features/auth/queries";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
@@ -48,6 +49,7 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
 
   return (
     <>
+      <ServiceCenterTabs active={view === "closed" ? "closed" : "bench"} counts={{ bench: totals.open, incoming: incomingCount, closed: totals.closed }} />
       <PageBand
         eyebrow={`${ws.current.name} · ${first}`}
         title={view === "closed" ? "Closed" : "My bench"}
@@ -57,7 +59,7 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
           </ButtonLink>
         }
       />
-      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} counts={{ bench: totals.open, incoming: incomingCount, closed: totals.closed }} />
+      <BenchView bench={bench} view={view} filter={filter} sort={sort} query={query} />
     </>
   );
 }

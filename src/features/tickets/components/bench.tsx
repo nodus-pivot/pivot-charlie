@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Lightning, MagnifyingGlass, Package, Watch } from "@phosphor-icons/react/dist/ssr";
-import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
 import { Chip, ChipLink } from "@/components/ui/chip";
 import { buttonClasses } from "@/components/ui/button";
 import { STAGE_LABELS } from "@/features/pipeline";
@@ -14,7 +13,6 @@ type Props = {
   filter: BenchFilter;
   sort: BenchSort;
   query: string;
-  counts: { bench: number | null; incoming: number | null; closed: number | null };
 };
 
 function href(params: Record<string, string | undefined>): string {
@@ -24,7 +22,7 @@ function href(params: Record<string, string | undefined>): string {
   return s ? `/service-center?${s}` : "/service-center";
 }
 
-export function BenchView({ bench, view, filter, sort, query, counts }: Props) {
+export function BenchView({ bench, view, filter, sort, query }: Props) {
   const { stats } = bench;
   const closed = view === "closed";
   return (
@@ -37,8 +35,6 @@ export function BenchView({ bench, view, filter, sort, query, counts }: Props) {
           <StatCard label="Ready to ship" value={stats.readyToShip.count} note={stats.readyToShip.note} />
         </div>
       ) : null}
-
-      <ServiceCenterTabs active={closed ? "closed" : "bench"} counts={counts} />
 
       <div className="flex flex-wrap items-center gap-2">
         {!closed

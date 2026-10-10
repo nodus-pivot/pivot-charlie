@@ -45,7 +45,7 @@ export default async function IncomingPage({ searchParams }: PageProps<"/service
   const totals = await countTickets(ws.current.id);
   return (
     <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3rem)] lg:flex-none">
-      <ServiceCenterTabs active="incoming" counts={{ bench: totals.open, incoming: queue.rows.length, closed: totals.closed }} className="flex-none px-4 sm:px-8 lg:px-12" />
+      <ServiceCenterTabs active="incoming" counts={{ bench: totals.open, incoming: queue.rows.length, closed: totals.closed }} />
       <IncomingView
       rows={queue.rows}
       catalog={queue.catalog}
