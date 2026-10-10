@@ -24,7 +24,11 @@ export type TicketDetail = {
   events: EventRow[];
   sheetRow: { moved_to_tab: string | null; moved_at: string | null } | null;
   catalog: { id: string; name: string; warranty_months: number | null }[];
+  /** Catalog parts that fit this watch, for the Replace picker. */
+  fits: FitPart[];
 };
+
+export type FitPart = { id: string; name: string; sku: string; component: Database["public"]["Enums"]["component"]; variant: string | null };
 
 /** Everything a ticket page needs, in one round trip per table. RLS decides visibility; null means not found or not yours. */
 export const getTicketDetail = cache(async (number: string): Promise<TicketDetail | null> => {
@@ -32,7 +36,7 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
   const { data: ticket } = await supabase.from("tickets").select("*").eq("number", number).maybeSingle();
   if (!ticket) return null;
 
-  const [watch, findings, parts, tests, shipment, photos, events, sheetRow, catalog] = await Promise.all([
+  const [watch, findings, parts, tests, shipment, photos, events, sheetRow, catalog, fits] = await Promise.all([
     supabase.from("watches").select("id, name, warranty_months").eq("id", ticket.watch_id).single(),
     supabase.from("ticket_findings").select("*, part:parts(id, name, sku)").eq("ticket_id", ticket.id).order("created_at"),
     supabase.from("ticket_parts").select("*, part:parts(id, name, sku, component)").eq("ticket_id", ticket.id).order("created_at"),
@@ -42,6 +46,7 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
     supabase.from("ticket_events").select("*").eq("ticket_id", ticket.id).order("created_at"),
     ticket.sheet_row_id ? supabase.from("sheet_rows").select("moved_to_tab, moved_at").eq("id", ticket.sheet_row_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("watches").select("id, name, warranty_months").eq("brand_id", ticket.brand_id).eq("is_active", true).order("name"),
+    supabase.from("watch_parts").select("part:parts(id, name, sku, component, variant, is_active)").eq("watch_id", ticket.watch_id),
   ]);
 
   const actorIds = [...new Set((events.data ?? []).map((e) => e.actor_id).filter((x): x is string => !!x))];
@@ -59,5 +64,10 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
     events: (events.data ?? []).map((e) => ({ ...e, actor_name: e.actor_id ? (nameOf.get(e.actor_id) ?? null) : null })),
     sheetRow: sheetRow.data ?? null,
     catalog: catalog.data ?? [],
+    fits: (fits.data ?? [])
+      .map((r) => r.part as unknown as FitPart & { is_active: boolean })
+      .filter((p) => p && p.is_active)
+      .map(({ id, name, sku, component, variant }) => ({ id, name, sku, component, variant }))
+      .sort((a, b) => a.component.localeCompare(b.component) || a.name.localeCompare(b.name)),
   };
 });

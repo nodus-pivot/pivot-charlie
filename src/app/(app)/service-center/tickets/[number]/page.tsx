@@ -5,6 +5,7 @@ import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { STAGE_LABELS, canActOn } from "@/features/pipeline";
 import { getTicketDetail } from "@/features/tickets/detail";
 import { CheckInStep } from "@/features/tickets/components/check-in-step";
+import { InspectStep } from "@/features/tickets/components/inspect-step";
 import { TicketFrame } from "@/features/tickets/components/ticket-frame";
 import { getWorkspaceContext } from "@/features/workspaces/queries";
 import { formatDate } from "@/lib/format";
@@ -34,6 +35,16 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         priority={t.priority}
         needsPayment={t.needs_payment}
         returnToEverett={t.return_to_everett}
+        canAct={canAct}
+      />
+    );
+  } else if (t.stage === "inspect") {
+    step = (
+      <InspectStep
+        number={t.number}
+        initial={detail.findings.map((f) => ({ component: f.component, condition: f.condition, action: f.action, partId: f.part_id }))}
+        fits={detail.fits}
+        note={t.inspect_note ?? ""}
         canAct={canAct}
       />
     );

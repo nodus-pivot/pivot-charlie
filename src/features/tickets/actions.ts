@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/features/auth/queries";
-import { canActOn, isAdminOf, type Stage } from "@/features/pipeline";
+import { COMPONENTS, canActOn, isAdminOf, type Component, type Stage } from "@/features/pipeline";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -164,6 +164,67 @@ export async function addComment(number: string, body: string): Promise<ActionRe
   const t = await load(number);
   if (!t.ok) return t;
   const { error } = await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "comment", actor_id: t.userId, body: text });
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- inspect & fix: findings */
+
+const findingInput = z.object({
+  component: z.enum(COMPONENTS as [Component, ...Component[]]),
+  condition: z.enum(["worn", "scratched", "discolored", "cracked"]).nullable(),
+  action: z.enum(["fix", "replace"]),
+  partId: z.uuid().nullable(),
+  note: z.string().trim().max(500).nullable().optional(),
+});
+export type FindingInput = z.infer<typeof findingInput>;
+
+/** Add or change the finding for a component. Allowed on Inspect and Fix (rows found on the bench) by whoever owns the stage. */
+export async function setFinding(number: string, raw: unknown): Promise<ActionResult & { id?: string }> {
+  const parsed = findingInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the finding." };
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "inspect" && t.stage !== "fix") return { ok: false, error: "Findings are recorded on Inspect and Fix." };
+  if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id)) return { ok: false, error: "Your role can't record findings." };
+  const f = parsed.data;
+  const { data: existing } = await t.supabase.from("ticket_findings").select("id").eq("ticket_id", t.id).eq("component", f.component).maybeSingle();
+  const values = { condition: f.condition, action: f.action, part_id: f.action === "replace" ? f.partId : null, note: f.note ?? null };
+  const res = existing
+    ? await t.supabase.from("ticket_findings").update(values).eq("id", existing.id).select("id").single()
+    : await t.supabase.from("ticket_findings").insert({ ticket_id: t.id, component: f.component, found_at_stage: t.stage, created_by: t.userId, ...values }).select("id").single();
+  if (res.error) return { ok: false, error: message(res.error) };
+  refresh(number);
+  return { ok: true, id: res.data.id };
+}
+
+export async function removeFinding(number: string, component: Component): Promise<ActionResult> {
+  const parsed = z.enum(COMPONENTS as [Component, ...Component[]]).safeParse(component);
+  if (!parsed.success) return { ok: false, error: "Unknown component." };
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "inspect" && t.stage !== "fix") return { ok: false, error: "Findings are recorded on Inspect and Fix." };
+  if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id)) return { ok: false, error: "Your role can't record findings." };
+  const { error } = await t.supabase.from("ticket_findings").delete().eq("ticket_id", t.id).eq("component", parsed.data);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+const noteStage = z.enum(["inspect", "supply", "fix", "test"]);
+
+/** The free-text note under a step. Saved on blur. */
+export async function saveStageNote(number: string, stage: "inspect" | "supply" | "fix" | "test", note: string): Promise<ActionResult> {
+  const parsed = noteStage.safeParse(stage);
+  if (!parsed.success) return { ok: false, error: "Unknown step." };
+  const text = note.trim().slice(0, 2000) || null;
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id) && !isAdminOf(t.grants, t.workspace_id)) return { ok: false, error: "Your role can't edit this ticket." };
+  const update =
+    parsed.data === "inspect" ? { inspect_note: text } : parsed.data === "supply" ? { supply_note: text } : parsed.data === "fix" ? { fix_note: text } : { test_note: text };
+  const { error } = await t.supabase.from("tickets").update(update).eq("id", t.id);
   if (error) return { ok: false, error: message(error) };
   refresh(number);
   return { ok: true };
