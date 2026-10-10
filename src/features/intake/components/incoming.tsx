@@ -198,7 +198,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3rem)] lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh_-_3rem)] lg:flex-none lg:flex-row">
       {/* ---------------------------------------------------------------- queue */}
       <aside className="flex w-full flex-none flex-col border-b border-rule bg-panel lg:min-h-0 lg:w-[440px] lg:border-b-0 lg:border-r">
         <div className="flex flex-col gap-3.5 px-5 pb-3.5 pt-9">
