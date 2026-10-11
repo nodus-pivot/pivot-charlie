@@ -53,3 +53,20 @@ export function canEditOps(grants: Grant[], workspaceId: string): boolean {
 export function canUseViewAs(realGrants: Grant[]): boolean {
   return isAnyAdmin(realGrants);
 }
+
+/* ---------------------------------------------------------------- people */
+
+/** Mirrors app.membership_manageable(): owners grant anything; admins grant brand roles inside their workspaces. */
+export function canManageGrant(grants: Grant[], target: Grant, brandWorkspace: (brandId: string) => string | undefined): boolean {
+  if (isOwner(grants)) return true;
+  if (target.role !== "brand_rep" && target.role !== "watchmaker") return false;
+  const ws = target.brand_id ? brandWorkspace(target.brand_id) : undefined;
+  return !!ws && isAdminOf(grants, ws);
+}
+
+/** Mirrors app.can_manage_user(): someone else, and every grant they hold is one the caller could manage. */
+export function canManagePerson(grants: Grant[], selfId: string, personId: string, personGrants: Grant[], brandWorkspace: (brandId: string) => string | undefined): boolean {
+  if (selfId === personId) return false;
+  if (isOwner(grants)) return true;
+  return personGrants.every((g) => canManageGrant(grants, g, brandWorkspace));
+}
