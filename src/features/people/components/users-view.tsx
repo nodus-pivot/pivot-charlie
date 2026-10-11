@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, Copy, Plus, X } from "@phosphor-icons/react";
+import { CaretUpDown, Check, Copy, Plus, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { canManageGrant, canManagePerson } from "@/features/auth/permissions";
@@ -120,7 +120,7 @@ function PersonRow({ p, selfId, realGrants, workspaces, brands, brandWorkspace, 
         {p.grants.map((g) => {
           const removable = manageable && !isSelf && canManageGrant(realGrants, g, brandWorkspace);
           return (
-            <span key={g.id} className="inline-flex items-center gap-1.5 rounded-pill border border-border-strong px-2.5 py-1 text-xs leading-none text-ink-2">
+            <span key={g.id} className="inline-flex h-7 items-center gap-1.5 rounded-pill border border-border-strong px-2.5 text-xs leading-none text-ink-2">
               {grantLabel(g, workspaces, brands)}
               {removable ? (
                 <button type="button" onClick={() => run(() => removeGrant(g.id))} disabled={pending} className="text-ink-3 hover:text-coral" aria-label={`Remove ${grantLabel(g, workspaces, brands)}`}><X size={11} /></button>
@@ -168,27 +168,41 @@ function PersonRow({ p, selfId, realGrants, workspaces, brands, brandWorkspace, 
 function GrantPicker({ workspaces, brands, realGrants, onPick, onCancel }: { workspaces: Named[]; brands: (Named & { workspace_id: string })[]; realGrants: Grant[]; onPick: (g: GrantInput) => void; onCancel: () => void }) {
   const owner = isOwner(realGrants);
   const roles = owner ? ROLES : (["brand_rep", "watchmaker"] as MemberRole[]);
-  const [role, setRole] = useState<MemberRole>(owner ? "watchmaker" : "watchmaker");
+  const [role, setRole] = useState<MemberRole>("watchmaker");
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
   const [workspaceId, setWorkspaceId] = useState(workspaces[0]?.id ?? "");
-  const sel = "h-8 border-b border-border-strong bg-transparent text-[13px] text-ink outline-none focus:border-gold [&>option]:bg-panel";
+  const sel = "h-full appearance-none bg-transparent pr-4 text-xs text-ink outline-none [&>option]:bg-panel";
+  const caret = "pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-ink-3";
   const grant = (): GrantInput => (role === "owner" ? { role } : role === "admin" ? { role, workspace_id: workspaceId } : { role, brand_id: brandId });
+  // One pill: role · scope · Add · ×, so it reads like the chips beside it.
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <select value={role} onChange={(e) => setRole(e.target.value as MemberRole)} className={sel} aria-label="Role">
-        {roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-      </select>
-      {role === "admin" ? (
-        <select value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} className={sel} aria-label="Workspace">
-          {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+    <span className="inline-flex h-7 items-stretch overflow-hidden rounded-pill border border-gold/70 bg-gold/5 text-xs leading-none">
+      <span className="relative flex items-center pl-3 pr-2">
+        <select value={role} onChange={(e) => setRole(e.target.value as MemberRole)} className={sel} aria-label="Role">
+          {roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
         </select>
-      ) : role !== "owner" ? (
-        <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={sel} aria-label="Brand">
-          {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        <CaretUpDown size={10} className={caret} />
+      </span>
+      {role !== "owner" ? (
+        <span className="relative flex items-center border-l border-gold/30 pl-3 pr-2">
+          {role === "admin" ? (
+            <select value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} className={sel} aria-label="Workspace">
+              {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          ) : (
+            <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={sel} aria-label="Brand">
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+          <CaretUpDown size={10} className={caret} />
+        </span>
       ) : null}
-      <Button size="sm" variant="primary" onClick={() => onPick(grant())}>Add</Button>
-      <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      <button type="button" onClick={() => onPick(grant())} className="flex items-center gap-1 border-l border-gold/30 px-3 font-medium text-gold-light hover:bg-gold/12">
+        <Plus size={10} /> Add
+      </button>
+      <button type="button" onClick={onCancel} aria-label="Cancel" className="flex items-center border-l border-gold/30 px-2.5 text-ink-3 hover:text-coral">
+        <X size={11} />
+      </button>
     </span>
   );
 }
