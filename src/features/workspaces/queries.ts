@@ -40,3 +40,18 @@ export const getVisibleBrands = cache(async (): Promise<BrandOption[]> => {
   const { data } = await supabase.from("brands").select("id, name, workspace_id").eq("is_active", true).order("name");
   return data ?? [];
 });
+
+export type BrandSummary = { id: string; name: string; slug: string; is_active: boolean; watches: number };
+
+/** The brands under a workspace with how many models each carries. Admin-only page. */
+export async function listWorkspaceBrands(workspaceId: string): Promise<BrandSummary[]> {
+  const supabase = await createClient();
+  const [{ data: brands, error }, { data: watches }] = await Promise.all([
+    supabase.from("brands").select("id, name, slug, is_active").eq("workspace_id", workspaceId).order("name"),
+    supabase.from("watches").select("brand_id").eq("workspace_id", workspaceId).eq("is_active", true),
+  ]);
+  if (error) throw error;
+  const by = new Map<string, number>();
+  for (const w of watches ?? []) by.set(w.brand_id, (by.get(w.brand_id) ?? 0) + 1);
+  return (brands ?? []).map((b) => ({ ...b, watches: by.get(b.id) ?? 0 }));
+}
