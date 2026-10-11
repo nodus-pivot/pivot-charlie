@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowLeft, CheckSquare, Square } from "@phosphor-icons/react";
+import { ArrowLeft, X } from "@phosphor-icons/react";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { COMPONENT_LABELS } from "@/features/pipeline";
@@ -114,29 +115,41 @@ export function WatchDetailView({ detail, canEdit }: { detail: WatchDetail; canE
         </div>
         {groups.length === 0 ? <p className="text-sm text-ink-3">No parts in the catalog yet.</p> : null}
         <div className="grid gap-x-14 gap-y-8 lg:grid-cols-2">
-          {groups.map((g) => (
-            <div key={g.component} className="flex flex-col">
-              <div className="flex items-center gap-2.5 border-b border-rule pb-2.5">
-                <ComponentIcon component={g.component} size={16} className="text-ink-2" />
-                <span className="font-display text-[22px] font-semibold text-ink">{COMPONENT_LABELS[g.component]}</span>
-                <span className="font-mono text-xs text-ink-3">{g.parts.filter((p) => p.fits).length}</span>
+          {groups.map((g) => {
+            const fitted = g.parts.filter((p) => p.fits);
+            const available = g.parts.filter((p) => !p.fits).map((p) => ({ value: p.id, label: p.name + (p.variant ? ` · ${p.variant}` : ""), hint: p.sku }));
+            return (
+              <div key={g.component} className="flex flex-col">
+                <div className="flex items-center gap-2.5 border-b border-rule pb-2.5">
+                  <ComponentIcon component={g.component} size={16} className="text-ink-2" />
+                  <span className="font-display text-[22px] font-semibold text-ink">{COMPONENT_LABELS[g.component]}</span>
+                  <span className="font-mono text-xs text-ink-3">{fitted.length}</span>
+                </div>
+                {fitted.length === 0 ? <p className="py-3 text-[13px] text-ink-3">No {COMPONENT_LABELS[g.component].toLowerCase()} part fits yet.</p> : null}
+                {fitted.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 border-b border-rule py-3">
+                    <span className="flex-1 text-[15px] text-ink">{p.name}{p.variant ? <span className="text-ink-3"> · {p.variant}</span> : null}</span>
+                    <span className="font-mono text-xs text-ink-3">{p.sku}</span>
+                    {canEdit ? (
+                      <button type="button" onClick={() => toggle(p.id, false)} className="text-ink-3 hover:text-coral" aria-label={`Remove ${p.name}`}>
+                        <X size={13} />
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                {canEdit ? (
+                  <Combobox
+                    className="mt-2"
+                    options={available}
+                    onPick={(id) => toggle(id, true)}
+                    placeholder={available.length ? `Add a ${COMPONENT_LABELS[g.component].toLowerCase()} part…` : "Every part of this type already fits"}
+                    disabled={available.length === 0}
+                    aria-label={`Add a ${COMPONENT_LABELS[g.component]} part`}
+                  />
+                ) : null}
               </div>
-              {g.parts.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => toggle(p.id, !p.fits)}
-                  disabled={!canEdit}
-                  aria-pressed={p.fits}
-                  className="flex items-center gap-3 border-b border-rule py-3 text-left transition-colors hover:bg-panel/60 disabled:opacity-100"
-                >
-                  {p.fits ? <CheckSquare size={18} className="shrink-0 text-gold-light" /> : <Square size={18} className="shrink-0 text-ink-3" />}
-                  <span className={cn("flex-1 text-[15px]", p.fits ? "text-ink" : "text-ink-3")}>{p.name}{p.variant ? <span className="text-ink-3"> · {p.variant}</span> : null}</span>
-                  <span className="font-mono text-xs text-ink-3">{p.sku}</span>
-                </button>
-              ))}
-            </div>
-          ))}
+            );
+          })}
         </div>
         <p className="text-[13px] text-ink-3">{fitsCount} parts fit. Stock isn&rsquo;t tracked here; the watchmaker marks what&rsquo;s in hand on each ticket&rsquo;s Supply step.</p>
       </section>
