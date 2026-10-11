@@ -309,3 +309,61 @@ export async function removeSparePart(number: string, rowId: string): Promise<Ac
   refresh(number);
   return { ok: true };
 }
+
+/* ---------------------------------------------------------------- fix */
+
+async function loadForFix(number: string) {
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "fix") return { ok: false as const, error: "That happens on the Fix step." };
+  if (!canActOn(t.grants, "fix", t.workspace_id, t.brand_id)) return { ok: false as const, error: "Your role can't work the bench." };
+  return t;
+}
+
+export async function markFindingDone(number: string, findingId: string, done: boolean): Promise<ActionResult> {
+  if (!z.uuid().safeParse(findingId).success) return { ok: false, error: "Unknown row." };
+  const t = await loadForFix(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase
+    .from("ticket_findings")
+    .update(done ? { done_at: new Date().toISOString(), done_by: t.userId } : { done_at: null, done_by: null })
+    .eq("id", findingId)
+    .eq("ticket_id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+export async function setFindingNote(number: string, findingId: string, note: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(findingId).success) return { ok: false, error: "Unknown row." };
+  const t = await loadForFix(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase.from("ticket_findings").update({ note: note.trim().slice(0, 500) || null }).eq("id", findingId).eq("ticket_id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+/** Time on bench, entered by hand until the timer exists. */
+export async function setBenchMinutes(number: string, minutes: number | null): Promise<ActionResult> {
+  const parsed = z.number().int().min(0).max(60 * 24 * 30).nullable().safeParse(minutes);
+  if (!parsed.success) return { ok: false, error: "Enter a time like 1:35." };
+  const t = await loadForFix(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase.from("tickets").update({ bench_minutes: parsed.data }).eq("id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+export async function setCoverage(number: string, coverage: "warranty" | "paid"): Promise<ActionResult> {
+  const parsed = z.enum(["warranty", "paid"]).safeParse(coverage);
+  if (!parsed.success) return { ok: false, error: "Unknown coverage." };
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id) && !isAdminOf(t.grants, t.workspace_id)) return { ok: false, error: "Your role can't change coverage." };
+  const { error } = await t.supabase.from("tickets").update({ coverage: parsed.data, needs_payment: parsed.data === "paid" ? true : undefined }).eq("id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}

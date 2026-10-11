@@ -7,6 +7,7 @@ import { getTicketDetail } from "@/features/tickets/detail";
 import { CheckInStep } from "@/features/tickets/components/check-in-step";
 import { InspectStep } from "@/features/tickets/components/inspect-step";
 import { SupplyStep } from "@/features/tickets/components/supply-step";
+import { FixStep } from "@/features/tickets/components/fix-step";
 import { TicketFrame } from "@/features/tickets/components/ticket-frame";
 import { getVisibleBrands, getWorkspaceContext } from "@/features/workspaces/queries";
 import { formatDate } from "@/lib/format";
@@ -75,6 +76,29 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         messages={detail.events.filter((e) => e.type === "parts_requested" && e.body).map((e) => ({ date: formatDate(e.created_at), body: e.body! }))}
         note={t.supply_note ?? ""}
         brandName={brands.find((b) => b.id === t.brand_id)?.name ?? "brand"}
+        canAct={canAct}
+      />
+    );
+  } else if (t.stage === "fix") {
+    step = (
+      <FixStep
+        key={revision}
+        number={t.number}
+        rows={detail.findings.map((f) => ({
+          id: f.id,
+          component: f.component,
+          action: f.action,
+          partId: f.part_id,
+          partName: f.part?.name ?? null,
+          partSku: f.part?.sku ?? null,
+          note: f.note ?? "",
+          foundOnBench: f.found_at_stage === "fix",
+          doneAt: f.done_at,
+        }))}
+        fits={detail.fits}
+        note={t.fix_note ?? ""}
+        benchMinutes={t.bench_minutes}
+        coverage={t.coverage}
         canAct={canAct}
       />
     );
