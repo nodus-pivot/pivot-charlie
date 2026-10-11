@@ -66,13 +66,24 @@ export async function readTab(title: string): Promise<string[][]> {
   return data.values ?? [];
 }
 
-/** Write one row at a 1-based row number (used instead of append: the month tabs have 'FALSE' filler far below the data). */
+/**
+ * Values go in RAW so serials and ZIPs keep their leading zeros, but the
+ * sheet's checkbox columns need real booleans: "TRUE"/"FALSE" strings would
+ * sit in a checkbox cell as text and show as invalid. Convert those two.
+ */
+function cellValue(v: string): string | boolean {
+  if (v === "TRUE") return true;
+  if (v === "FALSE") return false;
+  return v;
+}
+
+/** Write one row at a 1-based row number (used instead of append: the month tabs have checkbox filler far below the data). */
 export async function writeRow(title: string, row: number, values: string[]): Promise<void> {
   const range = tabRange(title, `A${row}`);
   await call(`/values/${encodeURIComponent(range)}`, {
     method: "PUT",
     params: { valueInputOption: "RAW" },
-    body: { range, majorDimension: "ROWS", values: [values] },
+    body: { range, majorDimension: "ROWS", values: [values.map(cellValue)] },
   });
 }
 
@@ -81,7 +92,7 @@ export async function writeCell(title: string, a1: string, value: string): Promi
   await call(`/values/${encodeURIComponent(range)}`, {
     method: "PUT",
     params: { valueInputOption: "RAW" },
-    body: { range, majorDimension: "ROWS", values: [[value]] },
+    body: { range, majorDimension: "ROWS", values: [[cellValue(value)]] },
   });
 }
 
