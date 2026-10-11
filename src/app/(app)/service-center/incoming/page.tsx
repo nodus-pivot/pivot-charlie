@@ -54,6 +54,8 @@ export default async function IncomingPage({ searchParams }: PageProps<"/service
       syncedAt={queue.syncedAt.toISOString()}
       stale={queue.stale}
       pendingMoves={queue.pendingMoves}
+      pendingWritebacks={queue.pendingWritebacks}
+      failedWritebacks={queue.failedWritebacks}
       monthTab={monthTabTitle()}
       initialSelected={typeof sp.row === "string" ? sp.row : undefined}
       />

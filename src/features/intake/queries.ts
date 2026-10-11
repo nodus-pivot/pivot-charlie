@@ -39,6 +39,9 @@ export type IncomingQueue = {
   /** Ledger rows whose sheet move did not finish. Shown as a notice with Retry. */
   pendingMoves: { id: string; fingerprint: string; status: "imported" | "dismissed"; name: string }[];
   catalog: CatalogWatch[];
+  /** Status cells queued for the month tabs and not yet written. */
+  pendingWritebacks: number;
+  failedWritebacks: { ticket: string; column: string; error: string }[];
 };
 
 export const getCatalog = cache(async (brandId: string): Promise<CatalogWatch[]> => {
@@ -49,17 +52,22 @@ export const getCatalog = cache(async (brandId: string): Promise<CatalogWatch[]>
 
 export async function listIncoming(workspaceId: string, brandId: string, opts: { force?: boolean } = {}): Promise<IncomingQueue> {
   const supabase = await createClient();
-  const [{ values, syncedAt, stale }, catalog, { data: ledger }] = await Promise.all([
+  const [{ values, syncedAt, stale }, catalog, { data: ledger }, { data: wb }] = await Promise.all([
     readIncomingValues(opts.force),
     getCatalog(brandId),
     supabase.from("sheet_rows").select("id, fingerprint, status, moved_at, raw").eq("workspace_id", workspaceId),
+    supabase.from("sheet_writebacks").select("status, column_name, last_error, ticket:tickets(number)").in("status", ["pending", "failed"]),
   ]);
   const acted = new Set((ledger ?? []).map((r) => r.fingerprint));
   const rows = parseIncoming(values, catalog).filter((r) => !acted.has(r.fingerprint));
   const pendingMoves = (ledger ?? [])
     .filter((r) => r.moved_at === null)
     .map((r) => ({ id: r.id, fingerprint: r.fingerprint, status: r.status, name: ((r.raw as Record<string, string>)?.Name ?? "a row").toString() }));
-  return { rows, syncedAt, stale, pendingMoves, catalog };
+  const pendingWritebacks = (wb ?? []).filter((w) => w.status === "pending").length;
+  const failedWritebacks = (wb ?? [])
+    .filter((w) => w.status === "failed")
+    .map((w) => ({ ticket: (w.ticket as unknown as { number: string } | null)?.number ?? "?", column: w.column_name, error: w.last_error ?? "" }));
+  return { rows, syncedAt, stale, pendingMoves, catalog, pendingWritebacks, failedWritebacks };
 }
 
 /** For the My bench tab count. Null when the sheet can't be reached, so the bench still renders. */

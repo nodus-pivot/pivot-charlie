@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/features/auth/queries";
 import { COMPONENTS, canActOn, isAdminOf, type Component, type Stage } from "@/features/pipeline";
 import { createClient } from "@/lib/supabase/server";
+import { drainQuietly } from "@/features/intake/writebacks";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -147,6 +148,7 @@ export async function advanceTicket(number: string, to: Stage, opts: { override?
       await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "email_logged", actor_id: t.userId, body: email.body, payload: { template: email.template } });
     }
   }
+  await drainQuietly(t.id);
   refresh(number);
   return { ok: true };
 }
@@ -499,6 +501,7 @@ export async function setPaymentReceived(number: string, received: boolean): Pro
   if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id) && !isAdminOf(t.grants, t.workspace_id)) return { ok: false, error: "Your role can't record payments." };
   const { error } = await t.supabase.from("tickets").update({ payment_received: received }).eq("id", t.id);
   if (error) return { ok: false, error: message(error) };
+  await drainQuietly(t.id);
   refresh(number);
   return { ok: true };
 }
@@ -513,6 +516,7 @@ export async function shipTicket(number: string, opts: { override?: boolean } = 
   if (shipment?.email_customer) {
     await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "email_logged", actor_id: t.userId, body: "On its way", payload: { template: "on_its_way" } });
   }
+  await drainQuietly(t.id);
   refresh(number);
   return { ok: true };
 }

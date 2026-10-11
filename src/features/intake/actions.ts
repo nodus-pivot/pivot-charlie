@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { moveIncomingRow } from "./moves";
 import { forgetIncoming, listIncoming } from "./queries";
 import { INCOMING_TAB } from "./sheet";
+import { drainWritebacks } from "./writebacks";
 import { ticketInput } from "./schema";
 
 export type IntakeResult = { ok: true; number: string; moveError?: string } | { ok: false; error: string };
@@ -140,4 +141,13 @@ export async function retryMoves(): Promise<{ ok: true; finished: number; failed
 export async function refreshIncoming(): Promise<void> {
   forgetIncoming();
   revalidatePath("/service-center", "layout");
+}
+
+/** Push every queued status cell to the month tabs now. */
+export async function syncSheet(): Promise<{ ok: true; applied: number; failed: string[] } | { ok: false; error: string }> {
+  const ctx = await intakeContext();
+  if (!ctx.ok) return ctx;
+  const r = await drainWritebacks();
+  revalidatePath("/service-center", "layout");
+  return { ok: true, applied: r.applied, failed: r.failed.map((f) => `${f.ticket} ${f.column}: ${f.error}`) };
 }

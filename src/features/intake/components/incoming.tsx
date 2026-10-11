@@ -8,7 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/utils";
-import { dismissRow, refreshIncoming, retryMoves } from "../actions";
+import { dismissRow, refreshIncoming, retryMoves, syncSheet } from "../actions";
 import type { CatalogWatch, IncomingRow } from "../sheet";
 import { TicketForm, draftFromRow, type Draft } from "./ticket-form";
 
@@ -20,6 +20,8 @@ type Props = {
   syncedAt: string;
   stale: boolean;
   pendingMoves: { id: string; name: string; status: "imported" | "dismissed" }[];
+  pendingWritebacks: number;
+  failedWritebacks: { ticket: string; column: string; error: string }[];
   monthTab: string;
   initialSelected?: string;
 };
@@ -27,7 +29,7 @@ type Props = {
 type Filter = "all" | "missing" | "payment" | "model";
 const timeFmt = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
 
-export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stale, pendingMoves, monthTab, initialSelected }: Props) {
+export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stale, pendingMoves, pendingWritebacks, failedWritebacks, monthTab, initialSelected }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -68,6 +70,16 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
   function patch(p: Partial<Draft>) {
     if (!selected || !draft) return;
     setDrafts((d) => ({ ...d, [selected.fingerprint]: { ...draft, ...p } }));
+  }
+
+  function sync() {
+    setError(null);
+    start(async () => {
+      const r = await syncSheet();
+      if (!r.ok) setError(r.error);
+      else setNotice(r.failed.length ? `${r.applied} cell${r.applied === 1 ? "" : "s"} written; still failing: ${r.failed.join("; ")}` : r.applied ? `${r.applied} cell${r.applied === 1 ? "" : "s"} written to the month tabs.` : "The sheet is up to date.");
+      router.refresh();
+    });
   }
 
   function retryPending() {
@@ -127,6 +139,9 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
             <button type="submit" className="flex items-center gap-1 text-[11px] uppercase tracking-label text-ink-3 hover:text-ink-2" title="Read the sheet again">
               <ArrowsClockwise size={12} aria-hidden /> Refresh
             </button>
+            <button type="button" onClick={sync} disabled={pending} className={cn("flex items-center gap-1 text-[11px] uppercase tracking-label hover:text-ink-2", pendingWritebacks || failedWritebacks.length ? "text-amber" : "text-ink-3")} title="Write queued status cells to the month tabs">
+              <ArrowsClockwise size={12} aria-hidden /> Sync{pendingWritebacks ? ` ${pendingWritebacks}` : ""}
+            </button>
           </form>
           <div className="flex flex-wrap gap-1.5">
             {(
@@ -168,6 +183,11 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
             </span>
             <button type="button" disabled={pending} onClick={retryPending} className="whitespace-nowrap underline-offset-2 hover:underline">Retry</button>
           </div>
+        ) : null}
+        {failedWritebacks.length ? (
+          <p className="mx-5 mb-2 text-xs text-coral">
+            {failedWritebacks.length} status cell{failedWritebacks.length === 1 ? "" : "s"} could not be written: {failedWritebacks.map((f) => `${f.ticket} ${f.column} (${f.error})`).join("; ")}
+          </p>
         ) : null}
         {notice ? <p className="mx-5 mb-2 text-xs text-green">{notice}</p> : null}
         {error ? <p role="alert" className="mx-5 mb-2 text-xs text-coral">{error}</p> : null}
