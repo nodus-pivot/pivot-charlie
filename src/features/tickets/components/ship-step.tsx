@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowRight, ArrowUUpLeft, CheckCircle, CheckSquare, HandArrowUp, Square } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { addressLines, type Address } from "@/lib/address";
+import { addressLines, isInternational, type Address } from "@/lib/address";
+import { CountrySelect } from "@/components/ui/country-select";
+import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/utils";
 import { saveShipment, sendBack, setPaymentReceived, shipTicket, updateShipTo } from "../actions";
 
@@ -33,7 +35,7 @@ export function ShipStep({ number, customerName, shipTo, returnToEverett, fulfil
     city: shipTo?.city ?? "",
     state: shipTo?.state ?? "",
     postal_code: shipTo?.postal_code ?? "",
-    country: shipTo?.country ?? "",
+    country: shipTo?.country ?? "US",
   });
   const [paid, setPaid] = useState(payment.received);
   const [error, setError] = useState<string | null>(null);
@@ -113,15 +115,16 @@ export function ShipStep({ number, customerName, shipTo, returnToEverett, fulfil
           <span className="text-[11px] uppercase tracking-label text-ink-3">Ship to</span>
           {editing ? (
             <div className="flex flex-col gap-2 border border-rule bg-panel p-3">
-              {(["line1", "line2", "city", "state", "postal_code", "country"] as const).map((k) => (
+              {(["line1", "line2", "city", "state", "postal_code"] as const).map((k) => (
                 <input
                   key={k}
                   value={addr[k]}
                   onChange={(e) => setAddr((a) => ({ ...a, [k]: e.target.value }))}
-                  placeholder={{ line1: "Street", line2: "Apt, suite (optional)", city: "City", state: "State", postal_code: "ZIP", country: "Country" }[k]}
+                  placeholder={{ line1: "Street", line2: "Apt, suite (optional)", city: "City", state: "State", postal_code: "ZIP" }[k]}
                   className="h-9 border-b border-border-strong bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none"
                 />
               ))}
+              <CountrySelect value={addr.country} onChange={(v) => setAddr((a) => ({ ...a, country: v }))} className="h-9 border-b border-border-strong text-[15px] text-ink focus:border-gold" />
               <div className="mt-1 flex justify-end gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
                 <Button size="sm" variant="primary" disabled={pending} onClick={saveAddress}>Save address</Button>
@@ -131,7 +134,10 @@ export function ShipStep({ number, customerName, shipTo, returnToEverett, fulfil
             <div className={cn("flex items-start gap-3 border p-3.5", form.handedOver ? "border-rule opacity-60" : "border-gold bg-gold/5")}>
               <CheckCircle size={18} className={cn("mt-0.5 shrink-0", form.handedOver ? "text-ink-3" : "text-gold-light")} />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[15px] text-ink">{destinationName}</span>
+                <span className="flex items-center gap-2 text-[15px] text-ink">
+                  {destinationName}
+                  {isInternational(destination) ? <Chip tone="amber">International · customs form</Chip> : null}
+                </span>
                 {destination && addressLines(destination).length ? (
                   <span className="text-sm text-ink-2">{addressLines(destination).join(" · ")}</span>
                 ) : (

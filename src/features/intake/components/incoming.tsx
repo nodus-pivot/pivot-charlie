@@ -214,6 +214,8 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
                     {r.model.kind === "none" ? <Chip tone="amber">Model not in catalog</Chip> : r.model.kind === "fuzzy" ? <Chip tone="amber">Model ≈ {r.model.watch.name}</Chip> : null}
                     {!r.hasEmail ? <Chip tone="amber">No email</Chip> : null}
                     {!r.hasAddress ? <Chip tone="amber">No address</Chip> : null}
+                    {r.countryUnknown ? <Chip tone="amber">Country?</Chip> : null}
+                    {r.hasAddress && !r.countryUnknown && r.address.country !== "US" ? <Chip tone="neutral">{r.address.country}</Chip> : null}
                     {r.needsPayment ? <Chip tone="coral"><CurrencyDollar size={11} /> Payment</Chip> : null}
                     {r.returnToEverett ? <Chip tone="neutral"><ArrowUUpLeft size={11} /> To Everett</Chip> : null}
                   </span>

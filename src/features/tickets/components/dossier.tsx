@@ -5,6 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { Microphone, Watch } from "@phosphor-icons/react";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Segmented } from "@/components/ui/segmented";
+import { CountrySelect } from "@/components/ui/country-select";
 import { addressInline, type Address } from "@/lib/address";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,7 @@ function fieldsFrom(d: DossierData): Fields {
       city: d.ship_to?.city ?? "",
       state: d.ship_to?.state ?? "",
       postal_code: d.ship_to?.postal_code ?? "",
-      country: d.ship_to?.country ?? "",
+      country: d.ship_to?.country ?? "US",
     },
     watchId: d.watch_id,
     serial: d.serial ?? "",
@@ -117,12 +118,12 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
             <div className="grid gap-1.5">
               <Text value={fields.shipTo.line1 ?? ""} onChange={(v) => patch({ shipTo: { ...fields.shipTo, line1: v } })} onBlur={() => save()} placeholder="Street" />
               <Text value={fields.shipTo.line2 ?? ""} onChange={(v) => patch({ shipTo: { ...fields.shipTo, line2: v } })} onBlur={() => save()} placeholder="Apt, suite" />
-              <div className="grid grid-cols-[1fr_56px_72px_44px] gap-1.5">
+              <div className="grid grid-cols-[1fr_56px_72px] gap-1.5">
                 <Text value={fields.shipTo.city ?? ""} onChange={(v) => patch({ shipTo: { ...fields.shipTo, city: v } })} onBlur={() => save()} placeholder="City" />
                 <Text value={fields.shipTo.state ?? ""} onChange={(v) => patch({ shipTo: { ...fields.shipTo, state: v } })} onBlur={() => save()} placeholder="ST" />
                 <Text value={fields.shipTo.postal_code ?? ""} onChange={(v) => patch({ shipTo: { ...fields.shipTo, postal_code: v } })} onBlur={() => save()} placeholder="ZIP" />
-                <Text value={fields.shipTo.country ?? ""} onChange={(v) => patch({ shipTo: { ...fields.shipTo, country: v } })} onBlur={() => save()} placeholder="US" />
               </div>
+              <CountrySelect value={fields.shipTo.country ?? ""} onChange={(v) => { patch({ shipTo: { ...fields.shipTo, country: v } }); save({ shipTo: { ...fields.shipTo, country: v } }); }} className="h-7 w-full text-base text-ink" />
             </div>
           ) : (
             <Value muted={!data.ship_to}>{data.ship_to ? addressInline(data.ship_to) : "No address yet"}</Value>

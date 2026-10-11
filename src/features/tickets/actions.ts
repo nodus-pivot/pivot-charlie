@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/features/auth/queries";
 import { COMPONENTS, canActOn, isAdminOf, type Component, type Stage } from "@/features/pipeline";
 import { createClient } from "@/lib/supabase/server";
 import { drainQuietly } from "@/features/intake/writebacks";
+import { countryField } from "@/features/intake/schema";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -36,7 +37,7 @@ const detailsInput = z.object({
   customerName: z.string().trim().min(1, "The customer needs a name.").max(200),
   customerEmail: z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() : ""), z.string().max(200)).transform((v) => v || null).pipe(z.email("Enter a valid email address.").nullable()),
   customerPhone: optional,
-  shipTo: z.object({ line1: optional, line2: optional, city: optional, state: optional, postal_code: optional, country: optional }),
+  shipTo: z.object({ line1: optional, line2: optional, city: optional, state: optional, postal_code: optional, country: countryField }),
   watchId: z.uuid(),
   serial: optional,
   coverage: z.enum(["warranty", "paid"]).nullable(),
@@ -480,7 +481,7 @@ export async function saveShipment(number: string, raw: unknown): Promise<Action
   return { ok: true };
 }
 
-const addressOnly = z.object({ line1: optional, line2: optional, city: optional, state: optional, postal_code: optional, country: optional });
+const addressOnly = z.object({ line1: optional, line2: optional, city: optional, state: optional, postal_code: optional, country: countryField });
 
 /** Edit the customer's ship-to address from the Ship step. */
 export async function updateShipTo(number: string, raw: unknown): Promise<ActionResult> {

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import type { PublicStatus } from "./public";
+import { countryField } from "@/features/intake/schema";
 
 /**
  * Public lookups. The anonymous Supabase client calls the two definer
@@ -38,7 +39,7 @@ const addressInput = z.object({
   city: z.string().trim().min(1, "Enter the city.").max(100),
   state: z.string().trim().max(50).optional().default(""),
   postal_code: z.string().trim().max(20).optional().default(""),
-  country: z.string().trim().max(60).optional().default(""),
+  country: countryField,
 });
 
 export type AddressRequestState = { ok?: boolean; error?: string };

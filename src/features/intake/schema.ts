@@ -1,7 +1,14 @@
 import { z } from "zod";
+import { normalizeCountry } from "@/lib/country";
 
 /** Optional text: null, undefined and blanks all become null. */
 const optional = z.preprocess((v) => (typeof v === "string" ? v.trim() : ""), z.string().max(500)).transform((v) => v || null);
+
+/** Country: stored as an ISO code when recognised, as typed otherwise (flagged in the UI), US when blank. */
+export const countryField = z.preprocess((v) => (typeof v === "string" ? v.trim() : ""), z.string().max(80)).transform((v) => {
+  const r = normalizeCountry(v);
+  return r.recognised ? r.code : r.raw || "US";
+});
 
 export const addressInput = z.object({
   line1: optional,
@@ -9,7 +16,7 @@ export const addressInput = z.object({
   city: optional,
   state: optional,
   postal_code: optional,
-  country: optional,
+  country: countryField,
 });
 
 /** What both intake forms send. `sheet` is present only from Incoming. */

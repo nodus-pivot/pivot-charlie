@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { normalizeCountry } from "@/lib/country";
 
 /**
  * Pure logic for the Google Sheet: header mapping, row parsing, fingerprints,
@@ -149,6 +150,8 @@ export type IncomingRow = {
   email: string;
   phone: string;
   address: { line1: string; line2: string; city: string; state: string; postal_code: string; country: string };
+  /** The country as typed could not be placed; the rep picks one. */
+  countryUnknown: boolean;
   hasEmail: boolean;
   hasAddress: boolean;
   issue: string;
@@ -167,6 +170,7 @@ export function parseIncoming(values: string[][], catalog: CatalogWatch[]): Inco
     const f = rowToFields(header, r);
     if (!f.name && !f.issue && !f.model) return; // blank filler row
     const { issue, claimRef, paymentAmount } = parseIssue(f.issue);
+    const country = normalizeCountry(f.country);
     const raw: Record<string, string> = {};
     header.forEach((h, k) => { if (h.trim()) raw[h.trim()] = (r[k] ?? "").toString(); });
     out.push({
@@ -178,7 +182,8 @@ export function parseIncoming(values: string[][], catalog: CatalogWatch[]): Inco
       name: f.name,
       email: f.email.toLowerCase(),
       phone: "",
-      address: { line1: f.line1, line2: f.line2, city: f.city, state: f.state, postal_code: f.zip, country: f.country },
+      address: { line1: f.line1, line2: f.line2, city: f.city, state: f.state, postal_code: f.zip, country: country.recognised ? country.code : country.raw },
+      countryUnknown: !country.recognised,
       hasEmail: /\S+@\S+\.\S+/.test(f.email),
       hasAddress: !!(f.line1 && f.city && f.zip),
       issue,

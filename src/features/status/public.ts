@@ -1,5 +1,6 @@
 import type { Stage } from "@/features/pipeline";
 import { formatDate } from "@/lib/format";
+import { countryName, isCountryCode, usStateName } from "@/lib/country";
 
 /**
  * The customer's view of the pipeline. Pure: maps the status payload from
@@ -20,8 +21,8 @@ export type PublicStatus = {
   tracking: string | null;
   handed_over: boolean;
   return_to_everett: boolean;
-  /** City, state and ZIP only; the street never reaches the browser. */
-  ship_to: { city?: string | null; state?: string | null; postal_code?: string | null } | null;
+  /** City, state and country only; the street and postal code never reach the browser. */
+  ship_to: { city?: string | null; state?: string | null; country?: string | null } | null;
   address_change_pending: boolean;
 };
 
@@ -77,9 +78,11 @@ export function rightNowNote(s: PublicStatus): string {
   }
 }
 
-/** "Santa Monica, CA 90405" — the masked return address. */
+/** "Santa Monica, California" at home; "Nantes, France" abroad. */
 export function maskedAddress(a: PublicStatus["ship_to"]): string {
   if (!a) return "";
-  const city = [a.city, a.state].filter(Boolean).join(", ");
-  return [city, a.postal_code].filter(Boolean).join(" ");
+  const country = (a.country ?? "US").toUpperCase();
+  if (country === "US" || !a.country) return [a.city, usStateName(a.state)].filter(Boolean).join(", ");
+  const name = isCountryCode(country) ? countryName(country) : a.country ?? "";
+  return [a.city, name].filter(Boolean).join(", ");
 }

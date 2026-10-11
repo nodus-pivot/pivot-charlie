@@ -5,6 +5,7 @@ import { ArrowRight, Check, Watch } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Field, Input } from "@/components/ui/field";
+import { CountrySelect } from "@/components/ui/country-select";
 import { cn } from "@/lib/utils";
 import { lookupRepair, requestAddressChange, type AddressRequestState, type LookupState } from "../actions";
 import { maskedAddress, publicLabel, publicSteps, rightNowNote } from "../public";
@@ -51,6 +52,7 @@ export function StatusLookup() {
 function Result({ s, email }: { s: NonNullable<LookupState["status"]>; email: string }) {
   const steps = publicSteps(s);
   const [changing, setChanging] = useState(false);
+  const [country, setCountry] = useState("US");
   const [addr, addrAction, addrPending] = useActionState<AddressRequestState, FormData>(requestAddressChange, {});
   const pendingChange = s.address_change_pending || addr.ok;
 
@@ -93,7 +95,7 @@ function Result({ s, email }: { s: NonNullable<LookupState["status"]>; email: st
 
       {s.stage !== "closed" && !s.return_to_everett ? (
         <div className="flex flex-col gap-2 border-t border-rule pt-5">
-          <span className="text-[11px] uppercase tracking-label text-ink-3">Return address <span className="normal-case tracking-normal">· city, state and ZIP</span></span>
+          <span className="text-[11px] uppercase tracking-label text-ink-3">Return address</span>
           <span className="text-sm text-ink-2">
             {maskedAddress(s.ship_to) || "We don\u2019t have one yet"}
             {!pendingChange && !changing ? (
@@ -111,12 +113,12 @@ function Result({ s, email }: { s: NonNullable<LookupState["status"]>; email: st
               <input type="hidden" name="email" value={email} />
               <Input name="line1" placeholder="Street" required />
               <Input name="line2" placeholder="Apt, suite (optional)" />
-              <div className="grid grid-cols-[1fr_72px_96px_64px] gap-3">
+              <div className="grid grid-cols-[1fr_72px_96px] gap-3">
                 <Input name="city" placeholder="City" required />
                 <Input name="state" placeholder="State" />
                 <Input name="postal_code" placeholder="ZIP" />
-                <Input name="country" placeholder="US" />
               </div>
+              <CountrySelect name="country" value={country} onChange={setCountry} className="h-11 border-b border-border-strong text-[15px] text-ink focus:border-gold" />
               {addr.error ? <p role="alert" className="text-[13px] text-coral">{addr.error}</p> : null}
               <div className="flex gap-2">
                 <Button size="sm" variant="ghost" type="button" onClick={() => setChanging(false)}>Cancel</Button>

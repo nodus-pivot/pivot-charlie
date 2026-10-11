@@ -6,6 +6,7 @@ import { ArrowRight, ArrowUUpLeft, Camera, Check, CurrencyDollar, Info, Lightnin
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Segmented, ToggleChip } from "@/components/ui/segmented";
+import { CountrySelect } from "@/components/ui/country-select";
 import { cn } from "@/lib/utils";
 import { createTicket } from "../actions";
 import type { CatalogWatch, IncomingRow } from "../sheet";
@@ -48,7 +49,7 @@ export const EMPTY_DRAFT: Draft = {
   city: "",
   state: "",
   postal_code: "",
-  country: "",
+  country: "US",
   watchId: "",
   serial: "",
   coverage: "warranty",
@@ -71,7 +72,7 @@ export function draftFromRow(r: IncomingRow): Draft {
     city: r.address.city,
     state: r.address.state,
     postal_code: r.address.postal_code,
-    country: r.address.country,
+    country: r.address.country || "US",
     watchId: r.model.kind === "none" ? "" : r.model.watch.id,
     serial: r.fields.serial,
     coverage: r.needsPayment ? "paid" : "warranty",
@@ -165,12 +166,12 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
             <div className="grid gap-2">
               <TextInput value={draft.line1} onChange={(v) => onPatch({ line1: v })} placeholder="Street" />
               <TextInput value={draft.line2} onChange={(v) => onPatch({ line2: v })} placeholder="Apt, suite (optional)" />
-              <div className="grid grid-cols-[1fr_72px_96px_64px] gap-2">
+              <div className="grid grid-cols-[1fr_72px_96px] gap-2">
                 <TextInput value={draft.city} onChange={(v) => onPatch({ city: v })} placeholder="City" />
                 <TextInput value={draft.state} onChange={(v) => onPatch({ state: v })} placeholder="State" />
                 <TextInput value={draft.postal_code} onChange={(v) => onPatch({ postal_code: v })} placeholder="ZIP" />
-                <TextInput value={draft.country} onChange={(v) => onPatch({ country: v })} placeholder="US" />
               </div>
+              <CountrySelect value={draft.country} onChange={(v) => onPatch({ country: v })} className="h-8 border-b border-transparent text-[17px] text-ink hover:border-rule focus:border-gold" />
             </div>
           </FieldRow>
         </div>
