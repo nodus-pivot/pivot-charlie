@@ -3,13 +3,14 @@ import type { ReactNode } from "react";
 import { PageBand } from "@/components/layout/page-band";
 import { Chip } from "@/components/ui/chip";
 import type { CurrentUser } from "@/features/auth/queries";
-import { canActOn } from "@/features/pipeline";
+import { canActOn, isAdminOf } from "@/features/pipeline";
 import { daysBetween, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { TicketDetail } from "../detail";
-import { statusWord, stepRows } from "../summary";
+import { closedRows, statusWord, stepRows } from "../summary";
 import { Dossier, type DossierData } from "./dossier";
 import { StepRail } from "./step-rail";
+import { ClosedView } from "./closed-view";
 
 /**
  * Band, dossier and step rail around whatever the current step renders.
@@ -32,7 +33,7 @@ export function TicketFrame({
   const t = detail.ticket;
   const parked = t.stage === "supply" && detail.parts.some((p) => p.requested_at && !p.have_it && !p.arrived_at);
   const status = statusWord({ stage: t.stage, closed_at: t.closed_at, parked });
-  const steps = stepRows({
+  const summaryInput = {
     stage: t.stage,
     bench_minutes: t.bench_minutes,
     closed_at: t.closed_at,
@@ -43,7 +44,16 @@ export function TicketFrame({
     tests: detail.tests,
     test_attempt: t.test_attempt,
     shipment: detail.shipment,
-  });
+  };
+  const steps = stepRows(summaryInput);
+  const closed = t.stage === "closed"
+    ? closedRows({
+        ...summaryInput,
+        source: t.source,
+        coverage: t.coverage,
+        emails: detail.events.filter((e) => e.type === "email_logged").map((e) => ((e.payload as { template?: string } | null)?.template ?? e.body ?? "")).filter(Boolean),
+      })
+    : null;
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
   const waiting = detail.parts.filter((p) => p.requested_at && !p.have_it && !p.arrived_at);
   const firstRequest = waiting.map((p) => p.requested_at!).sort()[0];
@@ -103,7 +113,7 @@ export function TicketFrame({
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <Dossier data={dossier} editable={editable} canComment />
-        <StepRail steps={steps} current={currentExtras}>{children}</StepRail>
+        {closed ? <ClosedView number={t.number} rows={closed} canReopen={isAdminOf(user.grants, t.workspace_id)} /> : <StepRail steps={steps} current={currentExtras}>{children}</StepRail>}
       </div>
     </>
   );

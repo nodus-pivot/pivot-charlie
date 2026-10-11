@@ -18,7 +18,7 @@ export type SummaryInput = {
   received_at: string | null;
   events: { type: string; from_stage: Stage | null; to_stage: Stage | null; created_at: string; actor_name: string | null }[];
   findings: { component: Component; action: "fix" | "replace"; condition: string | null; part: { name: string; sku: string } | null; done_at: string | null }[];
-  parts: { have_it: boolean; arrived_at: string | null; requested_at: string | null; label: string | null; part: { name: string } }[];
+  parts: { have_it: boolean; arrived_at: string | null; requested_at: string | null; label: string | null; part: { name: string; component?: string } }[];
   tests: { attempt: number; kind: string; result: string }[];
   test_attempt: number;
   shipment: { carrier: string | null; tracking: string | null; handed_over: boolean; shipped_at: string | null } | null;
@@ -96,4 +96,69 @@ export function statusWord(t: { stage: Stage; closed_at: string | null; parked: 
   if (t.stage === "closed") return { text: `closed ${formatDate(t.closed_at, now)}`, tone: "green" };
   if (t.parked) return { text: "waiting for parts", tone: "amber" };
   return { text: `in ${STAGE_LABELS[t.stage]}`, tone: "gold" };
+}
+
+/** S10: the repair as a record, one dated line per step. */
+export type ClosedRow = { label: string; text: string };
+
+const CONDITION_LABEL: Record<string, string> = { worn: "Worn", scratched: "Scratched", discolored: "Discolored", cracked: "Cracked" };
+const EMAIL_LABEL: Record<string, string> = { request_received: "Request received", repair_in_progress: "Repair in progress", testing: "Testing", on_its_way: "On its way back" };
+
+export function closedRows(
+  t: SummaryInput & { source: "sheet" | "by_hand"; coverage: "warranty" | "paid" | null; emails: string[] },
+  now: Date = new Date(),
+): ClosedRow[] {
+  const d = (iso: string | null) => (iso ? formatDate(iso, now) : null);
+  const checkIn = t.events.find((e) => e.type === "stage_changed" && e.from_stage === "check_in");
+  const rows: ClosedRow[] = [];
+
+  rows.push({
+    label: "Checked in",
+    text: [d(checkIn?.created_at ?? null), checkIn?.actor_name, t.source === "sheet" ? "from the website" : "by hand"].filter(Boolean).join(" · "),
+  });
+
+  rows.push({
+    label: "Inspected",
+    text: [
+      d(completedAt(t.events, "inspect")),
+      ...t.findings.map((f) => [COMPONENT_LABELS[f.component], f.condition ? CONDITION_LABEL[f.condition] : null, f.action === "replace" ? "Replace" : "Fix"].filter(Boolean).join(" · ")),
+    ].filter(Boolean).join(" · ") || "nothing to fix",
+  });
+
+  const supplyBits = t.parts.map((p) => {
+    const name = p.label ? p.label.toLowerCase() : p.part.component && p.part.component in COMPONENT_LABELS ? COMPONENT_LABELS[p.part.component as Component].toLowerCase() : p.part.name.toLowerCase();
+    if (p.have_it) return `had the ${name} in hand`;
+    if (p.requested_at) return `${name} requested ${d(p.requested_at)}${p.arrived_at ? `, arrived ${d(p.arrived_at)}` : ""}`;
+    return `${name} in hand`;
+  });
+  rows.push({ label: "Supply", text: [d(completedAt(t.events, "supply")), ...(supplyBits.length ? supplyBits : ["no parts needed"])].filter(Boolean).join(" · ") });
+
+  const fixBits = t.findings.map((f) =>
+    f.action === "replace" ? `Replace — ${f.part ? `${f.part.name} ${f.part.sku}` : COMPONENT_LABELS[f.component]}` : `${COMPONENT_LABELS[f.component]} fixed`,
+  );
+  rows.push({
+    label: "Fixed",
+    text: [d(completedAt(t.events, "fix")), ...fixBits, t.bench_minutes ? formatMinutes(t.bench_minutes) : null, t.coverage].filter(Boolean).join(" · "),
+  });
+
+  const attempts = Math.max(1, ...t.tests.map((x) => x.attempt));
+  rows.push({
+    label: "Tested",
+    text: [d(completedAt(t.events, "test")), "Time · Water · Looks all passed", attempts > 1 ? `on attempt ${attempts}` : null].filter(Boolean).join(" · "),
+  });
+
+  rows.push({
+    label: "Shipped",
+    text: t.shipment
+      ? [
+          d(t.shipment.shipped_at ?? completedAt(t.events, "ship")),
+          t.shipment.handed_over ? "handed over in person" : [t.shipment.carrier?.toUpperCase(), t.shipment.tracking].filter(Boolean).join(" "),
+          t.shipment.handed_over ? null : (t.shipment as { signature_required?: boolean }).signature_required ? "signature required" : "signature not required",
+        ].filter(Boolean).join(" · ")
+      : "—",
+  });
+
+  const sent = t.emails.map((k) => EMAIL_LABEL[k] ?? k);
+  rows.push({ label: "Emails", text: sent.length ? sent.join(" · ") : "none logged" });
+  return rows;
 }

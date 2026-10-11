@@ -516,3 +516,17 @@ export async function shipTicket(number: string, opts: { override?: boolean } = 
   refresh(number);
   return { ok: true };
 }
+
+/* ---------------------------------------------------------------- closed */
+
+/** Closed → Ship, owners and admins only (the database checks too). */
+export async function reopenTicket(number: string): Promise<ActionResult> {
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "closed") return { ok: false, error: "Only a closed ticket can be reopened." };
+  if (!isAdminOf(t.grants, t.workspace_id)) return { ok: false, error: "Reopen is for owners and admins." };
+  const { error } = await t.supabase.rpc("set_stage", { p_ticket: t.id, p_to: "ship", p_kind: "reopened" });
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
