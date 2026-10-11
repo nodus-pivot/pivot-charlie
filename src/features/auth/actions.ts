@@ -76,3 +76,43 @@ export async function clearViewAs(): Promise<void> {
   revalidatePath("/", "layout");
   redirect(AFTER_SIGN_IN_PATH);
 }
+
+/* ---------------------------------------------------------------- account */
+
+export type AccountResult = { ok: true } | { ok: false; error: string };
+
+/** Your own display name. RLS allows profile owners only; the nav chip updates on refresh. */
+export async function updateDisplayName(raw: { displayName: string }): Promise<AccountResult> {
+  const parsed = z.string().trim().min(1, "Enter a name.").max(80, "Keep it under 80 characters.").safeParse(raw.displayName);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Enter a name." };
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "You're signed out." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ display_name: parsed.data }).eq("id", user.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+const passwordChange = z
+  .object({
+    current: z.string().min(1, "Enter your current password."),
+    next: z.string().min(12, "Use at least 12 characters.").max(128),
+    confirm: z.string(),
+  })
+  .refine((d) => d.next === d.confirm, { message: "The two new passwords don't match.", path: ["confirm"] })
+  .refine((d) => d.next !== d.current, { message: "Choose a password you haven't used here.", path: ["next"] });
+
+/** Re-checks the current password before setting the new one, so a left-open session can't change it alone. */
+export async function changePassword(raw: { current: string; next: string; confirm: string }): Promise<AccountResult> {
+  const parsed = passwordChange.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the form." };
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "You're signed out." };
+  const supabase = await createClient();
+  const check = await supabase.auth.signInWithPassword({ email: user.email, password: parsed.data.current });
+  if (check.error) return { ok: false, error: "That current password is wrong." };
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.next });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

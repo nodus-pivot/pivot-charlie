@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CaretDown, Eye, SignOut, UserCircle } from "@phosphor-icons/react";
@@ -131,9 +132,9 @@ export function UserMenu({ chip, canViewAs, viewingAs, workspaces, brands }: Pro
           ) : (
             <ul className="flex flex-col">
               <li>
-                <span className="flex items-center gap-2.5 px-3 py-2 text-ink-3" aria-disabled>
-                  <UserCircle size={16} /> Account <span className="ml-auto text-[11px]">soon</span>
-                </span>
+                <Link href="/account" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-ink-2 hover:bg-ground hover:text-ink">
+                  <UserCircle size={16} /> Account
+                </Link>
               </li>
               {viewingAs ? (
                 <li>
