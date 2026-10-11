@@ -31,9 +31,9 @@ export const ROLE_LABELS: Record<MemberRole, string> = {
   watchmaker: "Watchmaker",
 };
 
-/** Inspect's chip order (twelve components). */
+/** The twelve components, alphabetical so a chip is easy to find. */
 export const COMPONENTS: Component[] = [
-  "bezel", "crystal", "crown", "case", "caseback", "dial", "hands", "movement", "gaskets", "strap", "clasp", "lume",
+  "bezel", "case", "caseback", "clasp", "crown", "crystal", "dial", "gaskets", "hands", "lume", "movement", "strap",
 ];
 
 export const COMPONENT_LABELS: Record<Component, string> = {
