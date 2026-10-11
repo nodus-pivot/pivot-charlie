@@ -534,3 +534,28 @@ export async function reopenTicket(number: string): Promise<ActionResult> {
   refresh(number);
   return { ok: true };
 }
+
+/* ---------------------------------------------------------------- customer address requests */
+
+/** Accept or decline the latest address change the customer asked for from Check a repair. */
+export async function resolveAddressRequest(number: string, eventId: string, accept: boolean): Promise<ActionResult> {
+  if (!z.uuid().safeParse(eventId).success) return { ok: false, error: "Unknown request." };
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id) && !isAdminOf(t.grants, t.workspace_id)) return { ok: false, error: "Your role can't change the address." };
+  const { data: ev } = await t.supabase.from("ticket_events").select("id, payload").eq("id", eventId).eq("ticket_id", t.id).eq("type", "address_update_requested").maybeSingle();
+  if (!ev) return { ok: false, error: "That request is gone." };
+  if (accept) {
+    const { error } = await t.supabase.from("tickets").update({ ship_to: ev.payload }).eq("id", t.id);
+    if (error) return { ok: false, error: message(error) };
+  }
+  await t.supabase.from("ticket_events").insert({
+    ticket_id: t.id,
+    type: accept ? "address_update_accepted" : "address_update_declined",
+    actor_id: t.userId,
+    body: accept ? "Return address updated at the customer's request" : "Customer's address change declined",
+    payload: ev.payload,
+  });
+  refresh(number);
+  return { ok: true };
+}

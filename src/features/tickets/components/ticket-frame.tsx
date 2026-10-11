@@ -11,6 +11,8 @@ import { closedRows, statusWord, stepRows } from "../summary";
 import { Dossier, type DossierData } from "./dossier";
 import { StepRail } from "./step-rail";
 import { ClosedView } from "./closed-view";
+import { AddressRequest } from "./address-request";
+import type { Address } from "@/lib/address";
 
 /**
  * Band, dossier and step rail around whatever the current step renders.
@@ -106,6 +108,13 @@ export function TicketFrame({
           <Link href="/service-center/incoming" className="underline underline-offset-2">Retry from Incoming</Link>
         </p>
       ) : null}
+      {(() => {
+        const req = [...detail.events].reverse().find((e) => e.type === "address_update_requested");
+        const resolved = req ? detail.events.some((e) => (e.type === "address_update_accepted" || e.type === "address_update_declined") && e.created_at > req.created_at) : true;
+        return req && !resolved && t.stage !== "closed" ? (
+          <AddressRequest number={t.number} eventId={req.id} address={(req.payload as Address) ?? {}} canAct={canActOn(user.grants, t.stage, t.workspace_id, t.brand_id)} />
+        ) : null;
+      })()}
       {t.return_to_everett ? (
         <p className="flex items-center gap-3 border-b border-rule bg-panel px-4 py-2 text-[13px] text-ink-2 sm:px-8 lg:px-12">
           <Chip tone="neutral">Return to Everett</Chip> Ships to Nodus fulfillment after the repair, not to the customer.

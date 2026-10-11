@@ -1046,6 +1046,14 @@ export type Database = {
           number: string
         }[]
       }
+      customer_request_address_update: {
+        Args: { p_address: Json; p_email: string; p_number: string }
+        Returns: boolean
+      }
+      customer_ticket_status: {
+        Args: { p_email: string; p_number: string }
+        Returns: Json
+      }
       my_real_grants: {
         Args: never
         Returns: {
