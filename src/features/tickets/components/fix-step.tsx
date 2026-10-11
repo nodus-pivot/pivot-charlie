@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, ArrowUUpLeft, Check, Play, Plus } from "@phosphor-icons/react";
+import { ArrowRight, ArrowUUpLeft, Check, Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { COMPONENTS, COMPONENT_LABELS, type Component } from "@/features/pipeline";
@@ -34,26 +34,13 @@ type Props = {
   canAct: boolean;
 };
 
-export function minutesToClock(min: number | null): string {
-  if (min === null || Number.isNaN(min)) return "";
-  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
-}
-
-export function clockToMinutes(s: string): number | null {
-  const t = s.trim();
-  if (!t) return null;
-  const m = t.match(/^(\d{1,3}):(\d{2})$/);
-  if (m) return Number(m[1]) * 60 + Number(m[2]);
-  if (/^\d+$/.test(t)) return Number(t);
-  return Number.NaN;
-}
-
 /** S7: planned rows plus rows found on the bench; a note and Mark done per row; bench notes, time on bench, covered by. */
 export function FixStep({ number, rows: initialRows, fits, note, benchMinutes, coverage, canAct }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [text, setText] = useState(note);
-  const [clock, setClock] = useState(minutesToClock(benchMinutes));
+  const [hours, setHours] = useState(benchMinutes === null ? "" : String(Math.floor(benchMinutes / 60)));
+  const [mins, setMins] = useState(benchMinutes === null ? "" : String(benchMinutes % 60));
   const [cover, setCover] = useState(coverage);
   const [error, setError] = useState<string | null>(null);
   const [, save] = useTransition();
@@ -105,15 +92,17 @@ export function FixStep({ number, rows: initialRows, fits, note, benchMinutes, c
     });
   }
 
-  function saveClock() {
-    const m = clockToMinutes(clock);
-    if (Number.isNaN(m)) {
-      setError("Enter a time like 1:35.");
+  function saveTime() {
+    const h = hours.trim() === "" ? 0 : Number(hours);
+    const m = mins.trim() === "" ? 0 : Number(mins);
+    if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || m < 0 || m > 59) {
+      setError("Enter whole hours and minutes (0–59).");
       return;
     }
-    if (m === benchMinutes) return;
+    const total = hours.trim() === "" && mins.trim() === "" ? null : h * 60 + m;
+    if (total === benchMinutes) return;
     save(async () => {
-      const res = await setBenchMinutes(number, m);
+      const res = await setBenchMinutes(number, total);
       if (!res.ok) setError(res.error);
     });
   }
@@ -245,7 +234,7 @@ export function FixStep({ number, rows: initialRows, fits, note, benchMinutes, c
         </div>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_180px_auto] lg:items-end">
+      <div className="grid gap-5 lg:grid-cols-[1fr_auto_auto] lg:items-end">
         <label className="flex flex-col gap-2">
           <span className="text-[11px] uppercase tracking-label text-ink-3">Bench notes</span>
           <input
@@ -257,22 +246,15 @@ export function FixStep({ number, rows: initialRows, fits, note, benchMinutes, c
             className="h-10 border-b border-border-strong bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none"
           />
         </label>
-        <label className="flex flex-col gap-2">
-          <span className="text-[11px] uppercase tracking-label text-ink-3">Time on bench</span>
-          <span className="flex h-10 items-center gap-3 border-b border-border-strong focus-within:border-gold">
-            <input
-              value={clock}
-              onChange={(e) => setClock(e.target.value)}
-              onBlur={saveClock}
-              disabled={!canAct}
-              placeholder="0:00"
-              inputMode="numeric"
-              aria-label="Time on bench, hours:minutes"
-              className="w-full bg-transparent font-mono text-[15px] text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
-            />
-            <span className="text-gold-light/50" title="Timer arrives in a later round"><Play size={16} /></span>
+        <div className="flex flex-col gap-2">
+          <span className="text-[11px] uppercase tracking-label text-ink-3">Time on bench <span className="normal-case tracking-normal">· optional</span></span>
+          <span className="flex h-10 items-center gap-2 font-mono text-[15px] text-ink">
+            <input value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, ""))} onBlur={saveTime} disabled={!canAct} placeholder="0" inputMode="numeric" aria-label="Hours on bench" className="w-10 border-b border-border-strong bg-transparent text-right outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none" />
+            <span className="text-ink-3">h</span>
+            <input value={mins} onChange={(e) => setMins(e.target.value.replace(/\D/g, "").slice(0, 2))} onBlur={saveTime} disabled={!canAct} placeholder="00" inputMode="numeric" aria-label="Minutes on bench" className="w-10 border-b border-border-strong bg-transparent text-right outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none" />
+            <span className="text-ink-3">min</span>
           </span>
-        </label>
+        </div>
         <div className="flex flex-col gap-2">
           <span className="text-[11px] uppercase tracking-label text-ink-3">Covered by</span>
           <Segmented
