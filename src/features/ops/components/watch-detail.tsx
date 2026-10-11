@@ -109,7 +109,7 @@ export function WatchDetailView({ detail, canEdit }: { detail: WatchDetail; canE
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Eyebrow>Components that fit this watch</Eyebrow>
           <span className="text-[13px] text-ink-3">
-            {canEdit ? "tick to add · " : ""}
+            {canEdit ? "type or pick to add · " : ""}
             <Link href="/ops/components" className="text-gold-light hover:text-gold">Missing a part? Add it in Components</Link>
           </span>
         </div>
