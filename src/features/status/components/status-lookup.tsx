@@ -5,10 +5,9 @@ import { ArrowRight, Check, Watch } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Field, Input } from "@/components/ui/field";
-import { addressInline } from "@/lib/address";
 import { cn } from "@/lib/utils";
 import { lookupRepair, requestAddressChange, type AddressRequestState, type LookupState } from "../actions";
-import { publicLabel, publicSteps, rightNowNote } from "../public";
+import { maskedAddress, publicLabel, publicSteps, rightNowNote } from "../public";
 
 const longDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Los_Angeles" });
 
@@ -94,9 +93,9 @@ function Result({ s, email }: { s: NonNullable<LookupState["status"]>; email: st
 
       {s.stage !== "closed" && !s.return_to_everett ? (
         <div className="flex flex-col gap-2 border-t border-rule pt-5">
-          <span className="text-[11px] uppercase tracking-label text-ink-3">Return address</span>
+          <span className="text-[11px] uppercase tracking-label text-ink-3">Return address <span className="normal-case tracking-normal">· city, state and ZIP</span></span>
           <span className="text-sm text-ink-2">
-            {s.ship_to && addressInline(s.ship_to) ? addressInline(s.ship_to) : "We don\u2019t have one yet"}
+            {maskedAddress(s.ship_to) || "We don\u2019t have one yet"}
             {!pendingChange && !changing ? (
               <>
                 {" · "}
@@ -105,7 +104,7 @@ function Result({ s, email }: { s: NonNullable<LookupState["status"]>; email: st
             ) : null}
           </span>
           {pendingChange ? (
-            <span className="text-[13px] text-green">We have your new address and will confirm it before shipping.</span>
+            <span className="text-[13px] text-green">We have your new address. We&rsquo;ll confirm it with you by email before anything ships.</span>
           ) : changing ? (
             <form action={addrAction} className="mt-2 grid gap-3">
               <input type="hidden" name="number" value={s.number} />

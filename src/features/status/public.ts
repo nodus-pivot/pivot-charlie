@@ -20,7 +20,8 @@ export type PublicStatus = {
   tracking: string | null;
   handed_over: boolean;
   return_to_everett: boolean;
-  ship_to: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal_code?: string | null; country?: string | null } | null;
+  /** City, state and ZIP only; the street never reaches the browser. */
+  ship_to: { city?: string | null; state?: string | null; postal_code?: string | null } | null;
   address_change_pending: boolean;
 };
 
@@ -74,4 +75,11 @@ export function rightNowNote(s: PublicStatus): string {
     case "closed":
       return s.tracking ? `Shipped ${s.carrier?.toUpperCase() ?? ""} ${s.tracking}`.trim() : "Thanks for sending it in.";
   }
+}
+
+/** "Santa Monica, CA 90405" — the masked return address. */
+export function maskedAddress(a: PublicStatus["ship_to"]): string {
+  if (!a) return "";
+  const city = [a.city, a.state].filter(Boolean).join(", ");
+  return [city, a.postal_code].filter(Boolean).join(" ");
 }

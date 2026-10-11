@@ -13,7 +13,7 @@ export function AddressRequest({ number, eventId, address, canAct }: { number: s
   const act = (accept: boolean) => start(async () => { const r = await resolveAddressRequest(number, eventId, accept); if (r.ok) router.refresh(); });
   return (
     <p className="flex flex-wrap items-center gap-3 border-b border-amber/40 bg-amber/10 px-4 py-2 text-[13px] text-amber sm:px-8 lg:px-12">
-      The customer asked to ship to <span className="text-ink">{addressInline(address)}</span> instead.
+      The customer asked to ship to <span className="text-ink">{addressInline(address)}</span> instead. Confirm it with them at the email on file before using it.
       {canAct ? (
         <span className="ml-auto flex gap-2">
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(false)}>Keep current</Button>
