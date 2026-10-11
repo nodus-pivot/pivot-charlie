@@ -139,6 +139,14 @@ export async function advanceTicket(number: string, to: Stage, opts: { override?
   if (!t.ok) return t;
   const { error } = await t.supabase.rpc("set_stage", { p_ticket: t.id, p_to: parsed.data, p_override: !!opts.override });
   if (error) return { ok: false, error: message(error) };
+  // Stage emails are logged, not sent, until a mailer exists. Request received and On its way are logged by their own steps.
+  const email = parsed.data === "fix" ? { template: "repair_in_progress", body: "Repair in progress" } : parsed.data === "test" ? { template: "testing", body: "Testing" } : null;
+  if (email && t.stage !== parsed.data) {
+    const { data: already } = await t.supabase.from("ticket_events").select("id").eq("ticket_id", t.id).eq("type", "email_logged").contains("payload", { template: email.template }).limit(1);
+    if (!already?.length) {
+      await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "email_logged", actor_id: t.userId, body: email.body, payload: { template: email.template } });
+    }
+  }
   refresh(number);
   return { ok: true };
 }
@@ -427,6 +435,84 @@ export async function failTest(number: string, kind: TestKind, note: string): Pr
   if (e2) return { ok: false, error: message(e2) };
   const label = parsed.data === "time" ? "Time" : parsed.data === "water" ? "Water" : "Looks";
   await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "comment", actor_id: t.userId, body: `${label} test failed${text ? `: ${text.replace(/[.\s]+$/, "")}` : ""}. Back to Fix.` });
+  refresh(number);
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- ship */
+
+async function loadForShip(number: string) {
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "ship") return { ok: false as const, error: "That happens on the Ship step." };
+  if (!canActOn(t.grants, "ship", t.workspace_id, t.brand_id)) return { ok: false as const, error: "Your role can't ship." };
+  return t;
+}
+
+const shipmentInput = z.object({
+  carrier: z.enum(["usps", "ups", "fedex"]).nullable(),
+  tracking: z.preprocess((v) => (typeof v === "string" ? v.trim() : ""), z.string().max(80)).transform((v) => v || null),
+  handedOver: z.boolean(),
+  signatureRequired: z.boolean(),
+  emailCustomer: z.boolean(),
+});
+export type ShipmentInput = z.infer<typeof shipmentInput>;
+
+/** The Ship form autosaves into the one shipments row per ticket. ship_to is snapshotted on every save. */
+export async function saveShipment(number: string, raw: unknown): Promise<ActionResult> {
+  const parsed = shipmentInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the shipment." };
+  const t = await loadForShip(number);
+  if (!t.ok) return t;
+  const { data: ticket } = await t.supabase.from("tickets").select("ship_to, return_to_everett, customer_name, workspace_id").eq("id", t.id).single();
+  const { data: ws } = await t.supabase.from("workspaces").select("fulfillment_address").eq("id", t.workspace_id).single();
+  const shipTo = ticket?.return_to_everett ? ws?.fulfillment_address : ticket?.ship_to ? { name: ticket.customer_name, ...(ticket.ship_to as object) } : null;
+  const d = parsed.data;
+  const { data: existing } = await t.supabase.from("shipments").select("id").eq("ticket_id", t.id).maybeSingle();
+  const values = { carrier: d.handedOver ? null : d.carrier, tracking: d.handedOver ? null : d.tracking, handed_over: d.handedOver, signature_required: d.signatureRequired, email_customer: d.emailCustomer, ship_to: shipTo };
+  const res = existing
+    ? await t.supabase.from("shipments").update(values).eq("id", existing.id)
+    : await t.supabase.from("shipments").insert({ ticket_id: t.id, created_by: t.userId, ...values });
+  if (res.error) return { ok: false, error: message(res.error) };
+  refresh(number);
+  return { ok: true };
+}
+
+const addressOnly = z.object({ line1: optional, line2: optional, city: optional, state: optional, postal_code: optional, country: optional });
+
+/** Edit the customer's ship-to address from the Ship step. */
+export async function updateShipTo(number: string, raw: unknown): Promise<ActionResult> {
+  const parsed = addressOnly.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Check the address." };
+  const t = await loadForShip(number);
+  if (!t.ok) return t;
+  const hasAddress = Object.values(parsed.data).some(Boolean);
+  const { error } = await t.supabase.from("tickets").update({ ship_to: hasAddress ? parsed.data : null }).eq("id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+export async function setPaymentReceived(number: string, received: boolean): Promise<ActionResult> {
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (!canActOn(t.grants, t.stage, t.workspace_id, t.brand_id) && !isAdminOf(t.grants, t.workspace_id)) return { ok: false, error: "Your role can't record payments." };
+  const { error } = await t.supabase.from("tickets").update({ payment_received: received }).eq("id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+/** Ship → Closed. The database checks tracking or handover and the payment gate (override for admins). Logs the customer email if ticked. */
+export async function shipTicket(number: string, opts: { override?: boolean } = {}): Promise<ActionResult> {
+  const t = await loadForShip(number);
+  if (!t.ok) return t;
+  const { data: shipment } = await t.supabase.from("shipments").select("email_customer").eq("ticket_id", t.id).maybeSingle();
+  const { error } = await t.supabase.rpc("set_stage", { p_ticket: t.id, p_to: "closed", p_override: !!opts.override });
+  if (error) return { ok: false, error: message(error) };
+  if (shipment?.email_customer) {
+    await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "email_logged", actor_id: t.userId, body: "On its way", payload: { template: "on_its_way" } });
+  }
   refresh(number);
   return { ok: true };
 }

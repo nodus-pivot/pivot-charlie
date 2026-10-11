@@ -2,13 +2,15 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/features/auth/queries";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
-import { STAGE_LABELS, canActOn } from "@/features/pipeline";
+import { STAGE_LABELS, canActOn, isAdminOf } from "@/features/pipeline";
+import type { Address } from "@/lib/address";
 import { getTicketDetail } from "@/features/tickets/detail";
 import { CheckInStep } from "@/features/tickets/components/check-in-step";
 import { InspectStep } from "@/features/tickets/components/inspect-step";
 import { SupplyStep } from "@/features/tickets/components/supply-step";
 import { FixStep } from "@/features/tickets/components/fix-step";
 import { TestStep } from "@/features/tickets/components/test-step";
+import { ShipStep } from "@/features/tickets/components/ship-step";
 import type { TestKind } from "@/features/tickets/actions";
 import { TicketFrame } from "@/features/tickets/components/ticket-frame";
 import { getVisibleBrands, getWorkspaceContext } from "@/features/workspaces/queries";
@@ -28,7 +30,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
   const t = detail.ticket;
   const canAct = canActOn(user.grants, t.stage, t.workspace_id, t.brand_id);
   // Step components keep optimistic local state; remount them whenever the server data they started from changes.
-  const revision = [t.stage, t.updated_at, ...detail.findings.map((f) => f.updated_at), ...detail.parts.map((p) => p.updated_at), detail.tests.map((x) => `${x.attempt}${x.kind}${x.result}`).join(","), detail.events.length].join("|");
+  const revision = [t.stage, t.updated_at, ...detail.findings.map((f) => f.updated_at), ...detail.parts.map((p) => p.updated_at), detail.tests.map((x) => `${x.attempt}${x.kind}${x.result}`).join(","), detail.shipment?.updated_at, detail.events.length].join("|");
 
   let step: React.ReactNode;
   if (t.stage === "check_in") {
@@ -115,6 +117,28 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
           .filter((x) => x.attempt < t.test_attempt && x.result === "fail")
           .map((x) => ({ attempt: x.attempt, kind: x.kind as TestKind, note: x.note, date: formatDate(x.created_at) }))}
         note={t.test_note ?? ""}
+        canAct={canAct}
+      />
+    );
+  } else if (t.stage === "ship") {
+    const sh = detail.shipment;
+    step = (
+      <ShipStep
+        key={revision}
+        number={t.number}
+        customerName={t.customer_name}
+        shipTo={t.ship_to}
+        returnToEverett={t.return_to_everett}
+        fulfillment={(ws.current?.fulfillment_address as Address | null) ?? null}
+        initial={{
+          carrier: (sh?.carrier as "usps" | "ups" | "fedex" | null) ?? null,
+          tracking: sh?.tracking ?? "",
+          handedOver: sh?.handed_over ?? false,
+          signatureRequired: sh?.signature_required ?? false,
+          emailCustomer: sh?.email_customer ?? true,
+        }}
+        payment={{ needed: t.needs_payment, amount: t.payment_amount, received: t.payment_received }}
+        isAdmin={isAdminOf(user.grants, t.workspace_id)}
         canAct={canAct}
       />
     );
