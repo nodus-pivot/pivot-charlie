@@ -8,6 +8,8 @@ import { authRedirect } from "@/features/auth/redirect";
  * decided by features/auth/redirect.ts.
  */
 export async function proxy(request: NextRequest) {
+  // Layouts can't read the URL; pass the pathname along for the Ops tab strip.
+  request.headers.set("x-pathname", request.nextUrl.pathname);
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
