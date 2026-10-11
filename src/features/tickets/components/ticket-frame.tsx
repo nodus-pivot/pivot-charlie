@@ -4,7 +4,7 @@ import { PageBand } from "@/components/layout/page-band";
 import { Chip } from "@/components/ui/chip";
 import type { CurrentUser } from "@/features/auth/queries";
 import { canActOn } from "@/features/pipeline";
-import { formatDate } from "@/lib/format";
+import { daysBetween, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { TicketDetail } from "../detail";
 import { statusWord, stepRows } from "../summary";
@@ -45,6 +45,14 @@ export function TicketFrame({
     shipment: detail.shipment,
   });
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
+  const waiting = detail.parts.filter((p) => p.requested_at && !p.have_it && !p.arrived_at);
+  const firstRequest = waiting.map((p) => p.requested_at!).sort()[0];
+  const currentExtras = parked
+    ? {
+        badge: <Chip tone="amber">Waiting on {waiting.length} part{waiting.length === 1 ? "" : "s"}</Chip>,
+        aside: firstRequest ? `waiting ${daysBetween(firstRequest)}d` : undefined,
+      }
+    : undefined;
   const editable = t.stage === "check_in" && canActOn(user.grants, "check_in", t.workspace_id, t.brand_id);
 
   const dossier: DossierData = {
@@ -95,7 +103,7 @@ export function TicketFrame({
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <Dossier data={dossier} editable={editable} canComment />
-        <StepRail steps={steps}>{children}</StepRail>
+        <StepRail steps={steps} current={currentExtras}>{children}</StepRail>
       </div>
     </>
   );

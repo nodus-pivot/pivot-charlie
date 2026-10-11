@@ -229,3 +229,83 @@ export async function saveStageNote(number: string, stage: "inspect" | "supply" 
   refresh(number);
   return { ok: true };
 }
+
+/* ---------------------------------------------------------------- supply: parts */
+
+async function loadForSupply(number: string) {
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "supply") return { ok: false as const, error: "Parts are handled on the Supply step." };
+  if (!canActOn(t.grants, "supply", t.workspace_id, t.brand_id)) return { ok: false as const, error: "Your role can't handle parts." };
+  return t;
+}
+
+export async function setPartHave(number: string, rowId: string, have: boolean): Promise<ActionResult> {
+  if (!z.uuid().safeParse(rowId).success) return { ok: false, error: "Unknown part row." };
+  const t = await loadForSupply(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase.from("ticket_parts").update({ have_it: have }).eq("id", rowId).eq("ticket_id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+export async function markPartArrived(number: string, rowId: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(rowId).success) return { ok: false, error: "Unknown part row." };
+  const t = await loadForSupply(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase.from("ticket_parts").update({ arrived_at: new Date().toISOString() }).eq("id", rowId).eq("ticket_id", t.id);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+/** Stamp requested_at on every part still needed and log the message to the brand rep. Parks the ticket (derived). */
+export async function requestParts(number: string): Promise<ActionResult & { message?: string }> {
+  const t = await loadForSupply(number);
+  if (!t.ok) return t;
+  const { data: rows } = await t.supabase
+    .from("ticket_parts")
+    .select("id, qty, label, part:parts(name, sku)")
+    .eq("ticket_id", t.id)
+    .eq("have_it", false)
+    .is("arrived_at", null);
+  if (!rows?.length) return { ok: false, error: "Every part is in hand already." };
+  const now = new Date().toISOString();
+  const { error } = await t.supabase.from("ticket_parts").update({ requested_at: now }).in("id", rows.map((r) => r.id));
+  if (error) return { ok: false, error: message(error) };
+  const list = rows.map((r) => {
+    const part = r.part as unknown as { name: string; sku: string } | null;
+    return `${r.qty}× ${r.label ?? part?.name ?? "part"}${part?.sku ? ` ${part.sku}` : ""}`;
+  });
+  const body = `Need ${list.join(", ")} for ${t.number}`;
+  await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "parts_requested", actor_id: t.userId, body, payload: { part_rows: rows.map((r) => r.id) } });
+  refresh(number);
+  return { ok: true, message: body };
+}
+
+const spareInput = z.object({ partId: z.uuid(), label: z.string().trim().max(120).nullable(), qty: z.number().int().min(1).max(20) });
+
+/** A part beyond the findings, e.g. a spare bezel insert. */
+export async function addSparePart(number: string, raw: unknown): Promise<ActionResult> {
+  const parsed = spareInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Pick a part." };
+  const t = await loadForSupply(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase
+    .from("ticket_parts")
+    .insert({ ticket_id: t.id, part_id: parsed.data.partId, label: parsed.data.label, qty: parsed.data.qty, created_by: t.userId });
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+export async function removeSparePart(number: string, rowId: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(rowId).success) return { ok: false, error: "Unknown part row." };
+  const t = await loadForSupply(number);
+  if (!t.ok) return t;
+  const { error } = await t.supabase.from("ticket_parts").delete().eq("id", rowId).eq("ticket_id", t.id).is("finding_id", null);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}

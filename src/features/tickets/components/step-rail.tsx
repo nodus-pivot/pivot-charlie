@@ -8,7 +8,7 @@ import type { StepRow } from "../summary";
  * check and their one-line summary; the current step opens under a gold
  * rule and holds its form; later steps are dim titles.
  */
-export function StepRail({ steps, children }: { steps: StepRow[]; children: ReactNode }) {
+export function StepRail({ steps, current, children }: { steps: StepRow[]; current?: { badge?: ReactNode; aside?: ReactNode }; children: ReactNode }) {
   return (
     <section className="flex min-w-0 flex-1 flex-col px-4 pb-9 pt-7 sm:px-8 lg:pl-[52px] lg:pr-12">
       {steps.map((s) => (
@@ -26,11 +26,14 @@ export function StepRail({ steps, children }: { steps: StepRow[]; children: Reac
             >
               {s.label}
               {s.state === "done" ? <Check size={18} className="text-green" aria-label="done" /> : null}
+              {s.state === "current" && current?.badge ? <span className="font-sans text-sm font-normal tracking-normal">{current.badge}</span> : null}
             </span>
             {s.state === "done" ? (
               <span className="ml-auto text-right text-[13px] text-ink-3">
                 {[s.date, s.summary].filter(Boolean).join(" · ")}
               </span>
+            ) : s.state === "current" && current?.aside ? (
+              <span className="ml-auto text-right text-[13px] text-ink-3">{current.aside}</span>
             ) : null}
           </div>
           {s.state === "current" ? children : null}
