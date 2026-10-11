@@ -367,3 +367,66 @@ export async function setCoverage(number: string, coverage: "warranty" | "paid")
   refresh(number);
   return { ok: true };
 }
+
+/* ---------------------------------------------------------------- test */
+
+const testKind = z.enum(["time", "water", "looks"]);
+export type TestKind = z.infer<typeof testKind>;
+
+async function loadForTest(number: string) {
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "test") return { ok: false as const, error: "That happens on the Test step." };
+  if (!canActOn(t.grants, "test", t.workspace_id, t.brand_id)) return { ok: false as const, error: "Your role can't run tests." };
+  return t;
+}
+
+async function upsertTest(t: Extract<Awaited<ReturnType<typeof load>>, { ok: true }>, kind: TestKind, result: "pass" | "fail", note: string | null) {
+  const { data: ticket } = await t.supabase.from("tickets").select("test_attempt").eq("id", t.id).single();
+  const attempt = ticket?.test_attempt ?? 1;
+  const { data: existing } = await t.supabase.from("ticket_tests").select("id").eq("ticket_id", t.id).eq("attempt", attempt).eq("kind", kind).maybeSingle();
+  return existing
+    ? t.supabase.from("ticket_tests").update({ result, note, created_by: t.userId }).eq("id", existing.id)
+    : t.supabase.from("ticket_tests").insert({ ticket_id: t.id, attempt, kind, result, note, created_by: t.userId });
+}
+
+export async function passTest(number: string, kind: TestKind): Promise<ActionResult> {
+  const parsed = testKind.safeParse(kind);
+  if (!parsed.success) return { ok: false, error: "Unknown test." };
+  const t = await loadForTest(number);
+  if (!t.ok) return t;
+  const { error } = await upsertTest(t, parsed.data, "pass", null);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+/** Clear a pass (undo) for the current attempt. */
+export async function clearTest(number: string, kind: TestKind): Promise<ActionResult> {
+  const parsed = testKind.safeParse(kind);
+  if (!parsed.success) return { ok: false, error: "Unknown test." };
+  const t = await loadForTest(number);
+  if (!t.ok) return t;
+  const { data: ticket } = await t.supabase.from("tickets").select("test_attempt").eq("id", t.id).single();
+  const { error } = await t.supabase.from("ticket_tests").delete().eq("ticket_id", t.id).eq("attempt", ticket?.test_attempt ?? 1).eq("kind", parsed.data);
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+/** Record the fail with its note, then send the watch back to Fix. The attempt counter bumps in set_stage. */
+export async function failTest(number: string, kind: TestKind, note: string): Promise<ActionResult> {
+  const parsed = testKind.safeParse(kind);
+  if (!parsed.success) return { ok: false, error: "Unknown test." };
+  const t = await loadForTest(number);
+  if (!t.ok) return t;
+  const text = note.trim().slice(0, 500) || null;
+  const { error } = await upsertTest(t, parsed.data, "fail", text);
+  if (error) return { ok: false, error: message(error) };
+  const { error: e2 } = await t.supabase.rpc("set_stage", { p_ticket: t.id, p_to: "fix", p_kind: "sent_back" });
+  if (e2) return { ok: false, error: message(e2) };
+  const label = parsed.data === "time" ? "Time" : parsed.data === "water" ? "Water" : "Looks";
+  await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "comment", actor_id: t.userId, body: `${label} test failed${text ? `: ${text.replace(/[.\s]+$/, "")}` : ""}. Back to Fix.` });
+  refresh(number);
+  return { ok: true };
+}
