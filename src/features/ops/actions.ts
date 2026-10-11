@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/features/auth/queries";
 import { canEditOps } from "@/features/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { COMPONENTS, type Component } from "@/features/pipeline";
 
 export type OpsResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -96,6 +97,63 @@ export async function setWatchPart(watchId: string, partId: string, fits: boolea
   const { error } = fits
     ? await ctx.supabase.from("watch_parts").upsert({ watch_id: watchId, part_id: partId }, { onConflict: "watch_id,part_id", ignoreDuplicates: true })
     : await ctx.supabase.from("watch_parts").delete().eq("watch_id", watchId).eq("part_id", partId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/ops", "layout");
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- parts */
+
+const partInput = z.object({
+  brandId: z.uuid(),
+  component: z.enum(COMPONENTS as [Component, ...Component[]]),
+  name: z.string().trim().min(1, "Give the part a name.").max(120),
+  sku: z.string().trim().min(1, "Give the part a SKU.").max(40).transform((v) => v.toUpperCase()),
+  variant: optional,
+});
+export type PartInput = z.input<typeof partInput>;
+
+export async function createPart(raw: unknown): Promise<OpsResult> {
+  const parsed = partInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the form." };
+  const ws = await workspaceOfBrand(parsed.data.brandId);
+  if (!ws) return { ok: false, error: "Unknown brand." };
+  const ctx = await adminFor(ws);
+  if (!ctx.ok) return ctx;
+  const d = parsed.data;
+  const { data, error } = await ctx.supabase
+    .from("parts")
+    .insert({ workspace_id: ws, brand_id: d.brandId, component: d.component, name: d.name, sku: d.sku, variant: d.variant })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.code === "23505" ? "That SKU already exists." : error.message };
+  revalidatePath("/ops", "layout");
+  return { ok: true, id: data.id };
+}
+
+export async function updatePart(partId: string, raw: unknown): Promise<OpsResult> {
+  if (!z.uuid().safeParse(partId).success) return { ok: false, error: "Unknown part." };
+  const parsed = partInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the form." };
+  const ws = await workspaceOfBrand(parsed.data.brandId);
+  if (!ws) return { ok: false, error: "Unknown brand." };
+  const ctx = await adminFor(ws);
+  if (!ctx.ok) return ctx;
+  const d = parsed.data;
+  const { error } = await ctx.supabase.from("parts").update({ component: d.component, name: d.name, sku: d.sku, variant: d.variant }).eq("id", partId);
+  if (error) return { ok: false, error: error.code === "23505" ? "That SKU already exists." : error.message };
+  revalidatePath("/ops", "layout");
+  return { ok: true };
+}
+
+export async function setPartActive(partId: string, active: boolean): Promise<OpsResult> {
+  if (!z.uuid().safeParse(partId).success) return { ok: false, error: "Unknown part." };
+  const supabase = await createClient();
+  const { data: p } = await supabase.from("parts").select("workspace_id").eq("id", partId).maybeSingle();
+  if (!p) return { ok: false, error: "Unknown part." };
+  const ctx = await adminFor(p.workspace_id);
+  if (!ctx.ok) return ctx;
+  const { error } = await ctx.supabase.from("parts").update({ is_active: active }).eq("id", partId);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/ops", "layout");
   return { ok: true };

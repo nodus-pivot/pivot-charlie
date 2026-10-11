@@ -49,3 +49,35 @@ export async function getWatch(id: string): Promise<WatchDetail | null> {
   })).filter((g) => g.parts.length > 0);
   return { watch, groups };
 }
+
+export type PartRow = {
+  id: string;
+  name: string;
+  sku: string;
+  variant: string | null;
+  component: Component;
+  is_active: boolean;
+  fits: { id: string; name: string }[];
+};
+
+/** Every part of the brand with the watches it fits, plus the watch options for the fits editor. */
+export async function listParts(brandId: string): Promise<{ parts: PartRow[]; watches: { id: string; name: string; reference: string | null }[] }> {
+  const supabase = await createClient();
+  const [{ data: parts, error }, { data: watches }, { data: fits }] = await Promise.all([
+    supabase.from("parts").select("id, name, sku, variant, component, is_active").eq("brand_id", brandId).order("name"),
+    supabase.from("watches").select("id, name, reference").eq("brand_id", brandId).eq("is_active", true).order("name"),
+    supabase.from("watch_parts").select("part_id, watch_id"),
+  ]);
+  if (error) throw error;
+  const nameOf = new Map((watches ?? []).map((w) => [w.id, w.name]));
+  const fitsBy = new Map<string, { id: string; name: string }[]>();
+  for (const f of fits ?? []) {
+    const name = nameOf.get(f.watch_id);
+    if (!name) continue;
+    fitsBy.set(f.part_id, [...(fitsBy.get(f.part_id) ?? []), { id: f.watch_id, name }]);
+  }
+  return {
+    parts: (parts ?? []).map((p) => ({ ...p, fits: (fitsBy.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)) })),
+    watches: watches ?? [],
+  };
+}
