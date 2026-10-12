@@ -119,6 +119,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          photo_path: string | null
           sku: string
           updated_at: string
           variant: string | null
@@ -131,6 +132,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          photo_path?: string | null
           sku: string
           updated_at?: string
           variant?: string | null
@@ -143,6 +145,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          photo_path?: string | null
           sku?: string
           updated_at?: string
           variant?: string | null

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/features/auth/queries";
 import { canEditOps } from "@/features/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { COMPONENTS, type Component } from "@/features/pipeline";
+import { photoPathBelongsTo } from "@/lib/photos";
 
 export type OpsResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -155,6 +156,43 @@ export async function setPartActive(partId: string, active: boolean): Promise<Op
   if (!ctx.ok) return ctx;
   const { error } = await ctx.supabase.from("parts").update({ is_active: active }).eq("id", partId);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/ops", "layout");
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- photos */
+
+const photoPath = z.string().min(1).max(200).nullable();
+
+/** Point the watch at a photo the browser already uploaded under watches/<id>/, or clear it. The old object is removed. */
+export async function setWatchPhoto(watchId: string, rawPath: unknown): Promise<OpsResult> {
+  const parsed = z.object({ id: z.uuid(), path: photoPath }).safeParse({ id: watchId, path: rawPath });
+  if (!parsed.success) return { ok: false, error: "That photo didn't upload." };
+  const supabase = await createClient();
+  const { data: watch } = await supabase.from("watches").select("workspace_id, photo_path").eq("id", parsed.data.id).maybeSingle();
+  if (!watch) return { ok: false, error: "Watch not found." };
+  const ctx = await adminFor(watch.workspace_id);
+  if (!ctx.ok) return ctx;
+  if (parsed.data.path && !photoPathBelongsTo(parsed.data.path, "watches", parsed.data.id)) return { ok: false, error: "That photo belongs to another watch." };
+  const { error } = await ctx.supabase.from("watches").update({ photo_path: parsed.data.path }).eq("id", parsed.data.id);
+  if (error) return { ok: false, error: error.message };
+  if (watch.photo_path && watch.photo_path !== parsed.data.path) await ctx.supabase.storage.from("photos").remove([watch.photo_path]);
+  revalidatePath("/ops", "layout");
+  return { ok: true };
+}
+
+export async function setPartPhoto(partId: string, rawPath: unknown): Promise<OpsResult> {
+  const parsed = z.object({ id: z.uuid(), path: photoPath }).safeParse({ id: partId, path: rawPath });
+  if (!parsed.success) return { ok: false, error: "That photo didn't upload." };
+  const supabase = await createClient();
+  const { data: part } = await supabase.from("parts").select("workspace_id, photo_path").eq("id", parsed.data.id).maybeSingle();
+  if (!part) return { ok: false, error: "Part not found." };
+  const ctx = await adminFor(part.workspace_id);
+  if (!ctx.ok) return ctx;
+  if (parsed.data.path && !photoPathBelongsTo(parsed.data.path, "parts", parsed.data.id)) return { ok: false, error: "That photo belongs to another part." };
+  const { error } = await ctx.supabase.from("parts").update({ photo_path: parsed.data.path }).eq("id", parsed.data.id);
+  if (error) return { ok: false, error: error.message };
+  if (part.photo_path && part.photo_path !== parsed.data.path) await ctx.supabase.storage.from("photos").remove([part.photo_path]);
   revalidatePath("/ops", "layout");
   return { ok: true };
 }

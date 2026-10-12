@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Lightning, MagnifyingGlass, Package, Watch } from "@phosphor-icons/react/dist/ssr";
 import { Chip, ChipLink } from "@/components/ui/chip";
+import { Img } from "@/components/ui/photo";
 import { buttonClasses } from "@/components/ui/button";
 import { STAGE_LABELS } from "@/features/pipeline";
 import { formatDate } from "@/lib/format";
@@ -109,8 +110,8 @@ function Row({ t, closed }: { t: BenchTicket; closed: boolean }) {
   const barTone = t.attention ? "bg-amber" : "bg-gold";
   return (
     <div className="grid grid-cols-[52px_1fr_auto] items-center gap-x-4 gap-y-2 border-t border-rule py-3.5 sm:gap-5 lg:grid-cols-[52px_1fr_130px_140px_190px]">
-      <Link href={to} className="grid size-[52px] place-items-center rounded-xs border border-rule bg-panel" aria-hidden tabIndex={-1}>
-        <Watch size={22} className="text-border-strong" />
+      <Link href={to} className="grid size-[52px] place-items-center overflow-hidden rounded-xs border border-rule bg-panel" aria-hidden tabIndex={-1}>
+        {t.bench_photo_path ? <Img path={t.bench_photo_path} alt="" className="size-full object-cover" /> : <Watch size={22} className="text-border-strong" />}
       </Link>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="flex items-center gap-2 font-display text-[22px] leading-tight font-semibold text-ink">

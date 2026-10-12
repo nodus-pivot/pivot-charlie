@@ -12,7 +12,7 @@ import { INCOMING_TAB } from "./sheet";
 import { drainWritebacks } from "./writebacks";
 import { ticketInput } from "./schema";
 
-export type IntakeResult = { ok: true; number: string; moveError?: string } | { ok: false; error: string };
+export type IntakeResult = { ok: true; id: string; number: string; moveError?: string } | { ok: false; error: string };
 
 // Input shapes live in schema.ts: a "use server" file may export only async functions.
 
@@ -67,6 +67,7 @@ export async function createTicket(raw: unknown): Promise<IntakeResult> {
   });
   if (error) return { ok: false, error: error.message.replace(/^.*?: /, "") };
   const number = data?.[0]?.number;
+  const ticketId = data?.[0]?.id;
   if (!number) return { ok: false, error: "The ticket was not created." };
 
   let moveError: string | undefined;
@@ -79,7 +80,7 @@ export async function createTicket(raw: unknown): Promise<IntakeResult> {
     }
   }
   revalidatePath("/service-center", "layout");
-  return { ok: true, number, moveError };
+  return { ok: true, id: ticketId!, number, moveError };
 }
 
 const dismissInput = z.object({

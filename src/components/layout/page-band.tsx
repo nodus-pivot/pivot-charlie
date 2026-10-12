@@ -13,6 +13,7 @@ export function PageBand({
   title,
   aside,
   action,
+  photo,
   className,
 }: {
   eyebrow: ReactNode;
@@ -20,11 +21,17 @@ export function PageBand({
   /** Secondary line to the right of the title, e.g. "Contrail GMT · NW260004 · in Fix". */
   aside?: ReactNode;
   action?: ReactNode;
+  /** URL of the photo behind the band (a bench photo of the watch). */
+  photo?: string;
   className?: string;
 }) {
   return (
     <section className={cn("relative h-[200px] flex-none overflow-hidden", className)}>
       <div aria-hidden className="absolute inset-0 bg-panel" />
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photo} alt="" aria-hidden className="absolute inset-0 size-full object-cover object-center" />
+      ) : null}
       <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(14,26,38,.25), rgba(14,26,38,.96))" }} />
       <div className="absolute inset-x-4 bottom-[22px] flex items-end justify-between gap-6 sm:inset-x-8 lg:inset-x-12">
         <div className="flex min-w-0 flex-col gap-2.5">

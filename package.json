@@ -11,7 +11,8 @@
     "db:push": "supabase db push",
     "db:seed": "python3 supabase/seed.py > supabase/seed.sql && supabase db query --linked --file supabase/seed.sql",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:seed:photos": "node --env-file=.env.local scripts/seed-photos.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

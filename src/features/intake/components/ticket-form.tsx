@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { ArrowRight, ArrowUUpLeft, Camera, Check, CurrencyDollar, Info, Lightning } from "@phosphor-icons/react";
+import { ArrowRight, ArrowUUpLeft, Check, CurrencyDollar, Info, Lightning, X } from "@phosphor-icons/react";
+import { AddPhotoSlot } from "@/components/ui/photo";
+import { uploadPhoto } from "@/lib/photos-client";
+import { addTicketPhoto } from "@/features/tickets/actions";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Segmented, ToggleChip } from "@/components/ui/segmented";
@@ -107,7 +110,15 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [photos, setPhotos] = useState<{ file: File; url: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const sheet = context.kind === "sheet" ? context.row : null;
+  function dropPhoto(i: number) {
+    setPhotos((ps) => {
+      URL.revokeObjectURL(ps[i].url);
+      return ps.filter((_, j) => j !== i);
+    });
+  }
   const watch = catalog.find((w) => w.id === draft.watchId) ?? null;
   const missing = missingFor(draft);
   const src = (s: string) => (sheet ? s : undefined);
@@ -144,6 +155,19 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
       if (!r.ok) {
         setError(r.error);
         return;
+      }
+      if (photos.length) {
+        // The ticket exists now, so its folder accepts uploads. A failed photo never blocks the ticket.
+        setUploading(true);
+        for (const p of photos) {
+          try {
+            const path = await uploadPhoto("tickets", r.id, p.file);
+            await addTicketPhoto(r.number, { path, kind: "customer" });
+          } catch {
+            /* the ticket page shows what made it */
+          }
+        }
+        setUploading(false);
       }
       router.push(`/service-center/tickets/${r.number}${r.moveError ? "?move=failed" : ""}`);
     });
@@ -262,12 +286,15 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
         />
         {sheet?.claimRef ? <span className="font-mono text-xs text-ink-3">Claim {sheet.claimRef}</span> : null}
         {!sheet ? (
-          <div className="mt-1 flex gap-2" aria-label="Customer photos, coming soon">
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="grid size-16 place-items-center rounded-xs border border-dashed border-border-strong text-border-strong" title="Photo uploads arrive in a later round">
-                <Camera size={18} />
+          <div className="mt-1 flex flex-wrap gap-2" aria-label="Customer photos">
+            {photos.map((p, i) => (
+              <span key={p.url} className="group relative size-16 overflow-hidden rounded-xs border border-rule bg-panel">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt={`Customer photo ${i + 1}`} className="size-full object-cover" />
+                <button type="button" onClick={() => dropPhoto(i)} aria-label={`Remove photo ${i + 1}`} className="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-ground/85 text-ink-2 opacity-0 transition-opacity hover:text-coral focus-visible:opacity-100 group-hover:opacity-100"><X size={11} /></button>
               </span>
             ))}
+            <AddPhotoSlot size="size-16" multiple onFiles={(files) => setPhotos((ps) => [...ps, ...files.map((file) => ({ file, url: URL.createObjectURL(file) }))])} label="Add customer photos" />
           </div>
         ) : null}
       </FieldRow>
@@ -285,7 +312,7 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
         {error ? <p role="alert" className="text-sm text-coral">{error}</p> : null}
         <div className="flex flex-wrap items-center gap-4">
           <Button variant="primary" disabled={pending || missing.length > 0} onClick={submit}>
-            {pending ? "Creating…" : "Create ticket"} <ArrowRight size={14} />
+            {uploading ? "Adding photos…" : pending ? "Creating…" : "Create ticket"} <ArrowRight size={14} />
           </Button>
           <span className="text-[13px] text-ink-2">
             {missing.length ? (

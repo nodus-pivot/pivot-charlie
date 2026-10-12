@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Watch } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Img } from "@/components/ui/photo";
 import type { WatchListRow } from "../queries";
 import { WatchForm } from "./watch-form";
 
@@ -44,7 +45,7 @@ function Row({ w, dim }: { w: WatchListRow; dim?: boolean }) {
       href={`/ops/watches/${w.id}`}
       className={`grid grid-cols-[72px_1fr_auto] items-center gap-x-4 gap-y-1 border-t border-rule py-4 transition-colors hover:bg-panel/60 lg:grid-cols-[72px_1fr_160px_120px_120px] lg:gap-5 ${dim ? "opacity-50" : ""}`}
     >
-      <span className="grid size-[72px] place-items-center rounded-xs border border-rule bg-panel text-border-strong"><Watch size={26} /></span>
+      <span className="grid size-[72px] place-items-center overflow-hidden rounded-xs border border-rule bg-panel text-border-strong">{w.photo_path ? <Img path={w.photo_path} alt={w.name} className="size-full object-cover" /> : <Watch size={26} />}</span>
       <span className="flex flex-col">
         <span className="font-display text-[26px] leading-tight font-semibold text-ink">{w.name}</span>
         <span className="text-[13px] text-ink-3 lg:hidden">{[w.reference, w.warranty_months ? `${w.warranty_months} mo` : null, `${w.fits} parts`].filter(Boolean).join(" · ")}</span>

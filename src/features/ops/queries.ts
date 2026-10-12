@@ -10,6 +10,7 @@ export type WatchListRow = {
   movement: string | null;
   case_spec: string | null;
   is_active: boolean;
+  photo_path: string | null;
   fits: number;
 };
 
@@ -17,7 +18,7 @@ export type WatchListRow = {
 export async function listWatches(brandId: string): Promise<WatchListRow[]> {
   const supabase = await createClient();
   const [{ data: watches, error }, { data: fits }] = await Promise.all([
-    supabase.from("watches").select("id, name, reference, warranty_months, movement, case_spec, is_active").eq("brand_id", brandId).order("name"),
+    supabase.from("watches").select("id, name, reference, warranty_months, movement, case_spec, is_active, photo_path").eq("brand_id", brandId).order("name"),
     supabase.from("watch_parts").select("watch_id"),
   ]);
   if (error) throw error;
@@ -29,14 +30,14 @@ export async function listWatches(brandId: string): Promise<WatchListRow[]> {
 export type CatalogPart = { id: string; name: string; sku: string; variant: string | null; component: Component; is_active: boolean };
 
 export type WatchDetail = {
-  watch: { id: string; brand_id: string; name: string; reference: string | null; warranty_months: number | null; movement: string | null; case_spec: string | null; notes: string | null; is_active: boolean };
+  watch: { id: string; brand_id: string; name: string; reference: string | null; warranty_months: number | null; movement: string | null; case_spec: string | null; notes: string | null; is_active: boolean; photo_path: string | null };
   /** Every active part of the brand, grouped by component in chip order, with whether it fits this watch. */
   groups: { component: Component; parts: (CatalogPart & { fits: boolean })[] }[];
 };
 
 export async function getWatch(id: string): Promise<WatchDetail | null> {
   const supabase = await createClient();
-  const { data: watch } = await supabase.from("watches").select("id, brand_id, name, reference, warranty_months, movement, case_spec, notes, is_active").eq("id", id).maybeSingle();
+  const { data: watch } = await supabase.from("watches").select("id, brand_id, name, reference, warranty_months, movement, case_spec, notes, is_active, photo_path").eq("id", id).maybeSingle();
   if (!watch) return null;
   const [{ data: parts }, { data: fits }] = await Promise.all([
     supabase.from("parts").select("id, name, sku, variant, component, is_active").eq("brand_id", watch.brand_id).eq("is_active", true).order("name"),
@@ -57,6 +58,7 @@ export type PartRow = {
   variant: string | null;
   component: Component;
   is_active: boolean;
+  photo_path: string | null;
   fits: { id: string; name: string }[];
 };
 
@@ -64,7 +66,7 @@ export type PartRow = {
 export async function listParts(brandId: string): Promise<{ parts: PartRow[]; watches: { id: string; name: string; reference: string | null }[] }> {
   const supabase = await createClient();
   const [{ data: parts, error }, { data: watches }, { data: fits }] = await Promise.all([
-    supabase.from("parts").select("id, name, sku, variant, component, is_active").eq("brand_id", brandId).order("name"),
+    supabase.from("parts").select("id, name, sku, variant, component, is_active, photo_path").eq("brand_id", brandId).order("name"),
     supabase.from("watches").select("id, name, reference").eq("brand_id", brandId).eq("is_active", true).order("name"),
     supabase.from("watch_parts").select("part_id, watch_id"),
   ]);

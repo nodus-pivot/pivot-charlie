@@ -7,6 +7,7 @@ import { COMPONENTS, canActOn, isAdminOf, type Component, type Stage } from "@/f
 import { createClient } from "@/lib/supabase/server";
 import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
+import { photoPathBelongsTo } from "@/lib/photos";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -557,6 +558,37 @@ export async function resolveAddressRequest(number: string, eventId: string, acc
     body: accept ? "Return address updated at the customer's request" : "Customer's address change declined",
     payload: ev.payload,
   });
+  refresh(number);
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- photos */
+
+const photoInput = z.object({ path: z.string().min(1).max(200), kind: z.enum(["customer", "bench"]) });
+
+/** Record a photo the browser already put in Storage under tickets/<id>/. */
+export async function addTicketPhoto(number: string, raw: unknown): Promise<ActionResult> {
+  const parsed = photoInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "That photo didn't upload." };
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (!photoPathBelongsTo(parsed.data.path, "tickets", t.id)) return { ok: false, error: "That photo belongs to another ticket." };
+  const { count } = await t.supabase.from("ticket_photos").select("id", { count: "exact", head: true }).eq("ticket_id", t.id).eq("kind", parsed.data.kind);
+  const { error } = await t.supabase.from("ticket_photos").insert({ ticket_id: t.id, kind: parsed.data.kind, storage_path: parsed.data.path, sort: count ?? 0, uploaded_by: t.userId });
+  if (error) return { ok: false, error: message(error) };
+  refresh(number);
+  return { ok: true };
+}
+
+export async function removeTicketPhoto(number: string, photoId: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(photoId).success) return { ok: false, error: "Reload and try again." };
+  const t = await load(number);
+  if (!t.ok) return t;
+  const { data: photo } = await t.supabase.from("ticket_photos").select("id, storage_path").eq("id", photoId).eq("ticket_id", t.id).maybeSingle();
+  if (!photo) return { ok: false, error: "That photo is already gone." };
+  const { error } = await t.supabase.from("ticket_photos").delete().eq("id", photo.id);
+  if (error) return { ok: false, error: message(error) };
+  await t.supabase.storage.from("photos").remove([photo.storage_path]);
   refresh(number);
   return { ok: true };
 }

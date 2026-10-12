@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Combobox } from "@/components/ui/combobox";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { Img, PhotoTile } from "@/components/ui/photo";
+import { uploadPhoto } from "@/lib/photos-client";
 import { COMPONENTS, COMPONENT_LABELS, type Component } from "@/features/pipeline";
 import { ComponentIcon } from "@/features/tickets/components/component-icon";
 import { cn } from "@/lib/utils";
-import { setPartActive, setWatchPart } from "../actions";
+import { setPartActive, setPartPhoto, setWatchPart } from "../actions";
 import type { PartRow } from "../queries";
 import { PartForm } from "./part-form";
 
@@ -127,8 +129,13 @@ export function ComponentsView({ parts, watches, brandId, selectedType, selected
                   aria-current={on ? "true" : undefined}
                   className={cn("flex flex-col gap-0.5 border-t border-rule px-5 py-3.5 transition-colors hover:bg-panel/60", on && "border-l-2 border-l-gold bg-gold/12 pl-[18px]", !p.is_active && "opacity-50")}
                 >
-                  <span className="text-[15px] text-ink">{p.name}{p.variant ? <span className="text-ink-3"> · {p.variant}</span> : null}</span>
-                  <span className="font-mono text-xs text-ink-3">{p.sku}{q ? ` · ${COMPONENT_LABELS[p.component]}` : ""}{!p.is_active ? " · retired" : ""}</span>
+                  <span className="flex items-center gap-3">
+                    {p.photo_path ? <Img path={p.photo_path} alt="" className="size-9 shrink-0 rounded-xs border border-rule object-cover" /> : null}
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-[15px] text-ink">{p.name}{p.variant ? <span className="text-ink-3"> · {p.variant}</span> : null}</span>
+                      <span className="font-mono text-xs text-ink-3">{p.sku}{q ? ` · ${COMPONENT_LABELS[p.component]}` : ""}{!p.is_active ? " · retired" : ""}</span>
+                    </span>
+                  </span>
                 </Link>
               </li>
             );
@@ -148,6 +155,26 @@ export function ComponentsView({ parts, watches, brandId, selectedType, selected
         ) : (
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-6">
+                <PhotoTile
+                  key={selected.id}
+                  className="w-[132px] shrink-0"
+                  path={selected.photo_path}
+                  alt={selected.name}
+                  canEdit={canEdit}
+                  placeholder={<ComponentIcon component={selected.component} size={34} />}
+                  onPick={async (file) => {
+                    const path = await uploadPhoto("parts", selected.id, file);
+                    const r = await setPartPhoto(selected.id, path);
+                    if (!r.ok) throw new Error(r.error);
+                    router.refresh();
+                  }}
+                  onRemove={async () => {
+                    const r = await setPartPhoto(selected.id, null);
+                    if (!r.ok) throw new Error(r.error);
+                    router.refresh();
+                  }}
+                />
               <div className="flex flex-col gap-2">
                 <Eyebrow><span className="font-mono normal-case tracking-normal">{selected.sku}</span> · {COMPONENT_LABELS[selected.component]}</Eyebrow>
                 <h1 className="font-display text-[44px] leading-none font-semibold tracking-[-0.02em] text-ink">{selected.name}</h1>
@@ -155,6 +182,7 @@ export function ComponentsView({ parts, watches, brandId, selectedType, selected
                   {selected.variant ? <Chip tone="gold">{selected.variant}</Chip> : null}
                   {!selected.is_active ? <Chip tone="neutral">retired</Chip> : null}
                 </div>
+              </div>
               </div>
               {canEdit ? (
                 <div className="flex items-center gap-2">

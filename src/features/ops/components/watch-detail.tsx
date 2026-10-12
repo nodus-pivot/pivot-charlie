@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowLeft, X } from "@phosphor-icons/react";
+import { ArrowLeft, Watch, X } from "@phosphor-icons/react";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { PhotoTile } from "@/components/ui/photo";
+import { uploadPhoto } from "@/lib/photos-client";
 import { COMPONENT_LABELS } from "@/features/pipeline";
 import { ComponentIcon } from "@/features/tickets/components/component-icon";
 import { cn } from "@/lib/utils";
-import { setWatchActive, setWatchPart } from "../actions";
+import { setWatchActive, setWatchPart, setWatchPhoto } from "../actions";
 import type { WatchDetail } from "../queries";
 import { WatchForm } from "./watch-form";
 
@@ -68,6 +70,24 @@ export function WatchDetailView({ detail, canEdit }: { detail: WatchDetail; canE
         <Link href="/ops/watches" className="flex items-center gap-1.5 text-[11px] uppercase tracking-label text-ink-3 hover:text-ink-2">
           <ArrowLeft size={12} /> Watches
         </Link>
+        <PhotoTile
+          className="mt-5 w-full max-w-[220px]"
+          path={watch.photo_path}
+          alt={watch.name}
+          canEdit={canEdit}
+          placeholder={<Watch size={40} />}
+          onPick={async (file) => {
+            const path = await uploadPhoto("watches", watch.id, file);
+            const r = await setWatchPhoto(watch.id, path);
+            if (!r.ok) throw new Error(r.error);
+            router.refresh();
+          }}
+          onRemove={async () => {
+            const r = await setWatchPhoto(watch.id, null);
+            if (!r.ok) throw new Error(r.error);
+            router.refresh();
+          }}
+        />
         <div className="mt-5 flex flex-col">
           {facts.map(([label, value]) => (
             <div key={label} className="flex flex-col gap-1.5 border-t border-rule py-3.5">

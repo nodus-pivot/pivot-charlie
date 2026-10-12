@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { Microphone, Watch } from "@phosphor-icons/react";
+import { Microphone } from "@phosphor-icons/react";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Segmented } from "@/components/ui/segmented";
 import { CountrySelect } from "@/components/ui/country-select";
@@ -10,6 +10,7 @@ import { addressInline, type Address } from "@/lib/address";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { addComment, updateTicketDetails, type DetailsInput } from "../actions";
+import { PhotoStrip } from "./photo-strip";
 
 export type DossierData = {
   number: string;
@@ -25,7 +26,7 @@ export type DossierData = {
   received_at: string | null;
   issue: string | null;
   bench_note: string | null;
-  photos: number;
+  photos: { id: string; path: string; kind: "customer" | "bench" }[];
   comments: { id: string; actor: string; date: string; body: string }[];
   catalog: { id: string; name: string; warranty_months: number | null }[];
 };
@@ -158,14 +159,13 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
         ) : null}
         <Row label="Customer said">
           <p className="text-sm leading-relaxed text-ink-2">{data.issue || <span className="text-ink-3">Nothing recorded.</span>}</p>
-          {data.photos > 0 ? (
-            <div className="flex gap-1.5">
-              {Array.from({ length: Math.min(data.photos, 4) }).map((_, i) => (
-                <span key={i} className="grid size-14 place-items-center rounded-xs border border-rule bg-panel text-border-strong"><Watch size={24} /></span>
-              ))}
-            </div>
-          ) : null}
+          <PhotoStrip number={data.number} kind="customer" photos={data.photos.filter((p) => p.kind === "customer")} canEdit={canComment} />
         </Row>
+        {canComment || data.photos.some((p) => p.kind === "bench") ? (
+          <Row label="From the bench">
+            <PhotoStrip number={data.number} kind="bench" photos={data.photos.filter((p) => p.kind === "bench")} canEdit={canComment} />
+          </Row>
+        ) : null}
         {data.bench_note ? (
           <Row label="Note to the bench">
             <p className="text-sm leading-relaxed text-ink-2">{data.bench_note}</p>

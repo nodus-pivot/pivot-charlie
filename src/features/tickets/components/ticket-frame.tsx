@@ -13,6 +13,7 @@ import { StepRail } from "./step-rail";
 import { ClosedView } from "./closed-view";
 import { AddressRequest } from "./address-request";
 import type { Address } from "@/lib/address";
+import { photoUrl } from "@/lib/photos";
 
 /**
  * Band, dossier and step rail around whatever the current step renders.
@@ -66,6 +67,7 @@ export function TicketFrame({
       }
     : undefined;
   const editable = t.stage === "check_in" && canActOn(user.grants, "check_in", t.workspace_id, t.brand_id);
+  const bandPhoto = detail.photos.find((p) => p.kind === "bench")?.storage_path ?? detail.photos[0]?.storage_path ?? null;
 
   const dossier: DossierData = {
     number: t.number,
@@ -81,7 +83,7 @@ export function TicketFrame({
     received_at: t.received_at,
     issue: t.issue,
     bench_note: t.bench_note,
-    photos: detail.photos.filter((p) => p.kind === "customer").length,
+    photos: detail.photos.map((p) => ({ id: p.id, path: p.storage_path, kind: p.kind })),
     comments: detail.events
       .filter((e) => e.type === "comment" && e.body)
       .map((e) => ({ id: e.id, actor: e.actor_name ?? "Someone", date: formatDate(e.created_at), body: e.body! })),
@@ -93,6 +95,7 @@ export function TicketFrame({
       <PageBand
         eyebrow={`${workspaceName} · ${first}`}
         title={t.customer_name}
+        photo={bandPhoto ? photoUrl(bandPhoto) : undefined}
         aside={
           <span className="text-base text-ink-2">
             {detail.watch.name} · <span className="font-mono">{t.number}</span> ·{" "}

@@ -29,7 +29,8 @@ export function CountrySelect({ value, onChange, disabled, className, name, "ari
       {unknown ? <option value={unknown}>{unknown} (pick a country)</option> : null}
       {!value ? <option value="">Country</option> : null}
       {COUNTRIES.map((c) => (
-        <option key={c.code} value={c.code}>{c.name}</option>
+        // Node and the browser ship slightly different ICU spellings; the code is what matters.
+        <option key={c.code} value={c.code} suppressHydrationWarning>{c.name}</option>
       ))}
     </select>
   );
