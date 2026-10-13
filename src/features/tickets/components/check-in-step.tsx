@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowRight, ArrowUUpLeft, CheckSquare, CurrencyDollar, Lightning, Square } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Soon } from "@/components/ui/soon";
 import { ToggleChip } from "@/components/ui/segmented";
 import { confirmCheckIn, setFlags, setOnBench } from "../actions";
 
@@ -85,8 +86,7 @@ export function CheckInStep({ number, sourceLine, received, priority, needsPayme
       </div>
 
       <div className="flex flex-wrap items-center gap-3.5">
-        <Button size="sm" disabled title="ShipStation arrives later">Print prepaid return label</Button>
-        <span className="text-[13px] text-ink-3">ShipStation · coming soon</span>
+        <Soon size="sm" hint="ShipStation">Print prepaid return label</Soon>
       </div>
 
       <button type="button" onClick={() => setEmail((e) => !e)} aria-pressed={email} className="flex items-center gap-2 self-start text-sm text-ink-2 hover:text-ink">

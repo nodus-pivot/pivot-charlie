@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { Microphone } from "@phosphor-icons/react";
 import { Eyebrow } from "@/components/ui/eyebrow";
+import { SoonIcon } from "@/components/ui/soon";
 import { Segmented } from "@/components/ui/segmented";
 import { CountrySelect } from "@/components/ui/country-select";
 import { addressInline, type Address } from "@/lib/address";
@@ -220,7 +221,7 @@ function Composer({ number }: { number: string }) {
           className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
           aria-label="Add a comment"
         />
-        <span title="Dictation arrives in a later round" className="text-gold-light/60"><Microphone size={15} /></span>
+        <SoonIcon hint="Dictation"><Microphone size={15} /></SoonIcon>
       </label>
       {error ? <p className="text-xs text-coral">{error}</p> : null}
       <p className="text-[11px] text-ink-3">Enter to post</p>

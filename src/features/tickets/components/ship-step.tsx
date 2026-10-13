@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowRight, ArrowUUpLeft, CheckCircle, CheckSquare, HandArrowUp, Square } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Soon } from "@/components/ui/soon";
 import { addressLines, isInternational, type Address } from "@/lib/address";
 import { CountrySelect } from "@/components/ui/country-select";
 import { Chip } from "@/components/ui/chip";
@@ -167,8 +168,7 @@ export function ShipStep({ number, customerName, shipTo, returnToEverett, fulfil
           <div className="flex flex-col gap-2">
             <span className="text-[11px] uppercase tracking-label text-ink-3">Label</span>
             <div className="flex flex-wrap items-center gap-3">
-              <Button size="sm" disabled title="ShipStation arrives later">Print USPS label</Button>
-              <span className="text-[13px] text-ink-3">ShipStation · coming soon</span>
+              <Soon size="sm" hint="ShipStation">Print USPS label</Soon>
             </div>
           </div>
           <div className="grid grid-cols-[110px_1fr] gap-4">

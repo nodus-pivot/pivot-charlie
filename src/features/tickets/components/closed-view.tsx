@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Soon } from "@/components/ui/soon";
 import { reopenTicket } from "../actions";
 import type { ClosedRow } from "../summary";
 
@@ -30,7 +31,7 @@ export function ClosedView({ number, rows, canReopen }: { number: string; rows: 
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5">
         <h2 className="font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-ink">Closed</h2>
         <div className="flex items-center gap-2">
-          <Button size="sm" disabled title="Export arrives in a later round">Export PDF</Button>
+          <Soon size="sm" hint="PDF export">Export PDF</Soon>
           {canReopen ? (
             confirm ? (
               <>
