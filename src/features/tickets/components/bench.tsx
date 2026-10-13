@@ -116,7 +116,7 @@ function Row({ t, closed }: { t: BenchTicket; closed: boolean }) {
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="flex items-center gap-2 font-display text-[22px] leading-tight font-semibold text-ink">
           {t.priority ? <Lightning size={14} weight="fill" className="shrink-0 text-coral" aria-label="Priority" /> : null}
-          <Link href={to} className="truncate hover:text-gold-light">{t.customer_name}</Link>
+          <Link href={to} className="sm:truncate hover:text-gold-light">{t.customer_name}</Link>
           {t.parked ? (
             <Chip tone="amber" className="hidden sm:inline-flex">
               <Package size={12} /> Waiting on {t.waiting_on?.split(",")[0].toLowerCase() ?? "part"}

@@ -227,7 +227,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
 
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-rule px-5 py-3.5">
           <ButtonLink href="/service-center/tickets/new" variant="primary" size="sm">New ticket by hand</ButtonLink>
-          <span className="text-xs text-ink-3">Rows come from the website form</span>
+          <span className="hidden text-xs text-ink-3 sm:inline">Rows come from the website form</span>
         </div>
       </aside>
 

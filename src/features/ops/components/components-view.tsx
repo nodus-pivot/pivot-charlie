@@ -177,7 +177,7 @@ export function ComponentsView({ parts, watches, brandId, selectedType, selected
                 />
               <div className="flex flex-col gap-2">
                 <Eyebrow><span className="font-mono normal-case tracking-normal">{selected.sku}</span> · {COMPONENT_LABELS[selected.component]}</Eyebrow>
-                <h1 className="font-display text-[44px] leading-none font-semibold tracking-[-0.02em] text-ink">{selected.name}</h1>
+                <h1 className="font-display text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink sm:text-[44px]">{selected.name}</h1>
                 <div className="flex items-center gap-2">
                   {selected.variant ? <Chip tone="gold">{selected.variant}</Chip> : null}
                   {!selected.is_active ? <Chip tone="neutral">retired</Chip> : null}

@@ -12,13 +12,18 @@ import { UserMenu } from "./user-menu";
  */
 export function AppNav({ user, ws, brands }: { user: CurrentUser; ws: WorkspaceContext; brands: BrandOption[] }) {
   const chip = navChip(user.grants, user.profile.display_name, { workspaceName: ws.current?.name ?? null, brands });
+  // Phones drop the workspace from the chip and move the module links into the menu.
+  const chipShort = chip.split(" · ").slice(-2).join(" · ");
+  const showOps = canOpenOps(user.grants);
   return (
-    <header className="flex h-12 flex-none items-center gap-5 border-b border-rule bg-panel px-4 text-xs uppercase tracking-label text-ink-3 sm:gap-7 sm:px-8 lg:px-12">
+    <header className="flex h-12 min-w-0 flex-none items-center gap-5 border-b border-rule bg-panel px-4 text-xs uppercase tracking-label text-ink-3 sm:gap-7 sm:px-8 lg:px-12">
       <Wordmark href="/service-center" className="text-xl" />
-      <NavLinks showOps={canOpenOps(user.grants)} />
-      <div className="ml-auto">
+      <NavLinks showOps={showOps} className="hidden sm:flex" />
+      <div className="ml-auto min-w-0">
         <UserMenu
           chip={chip}
+          chipShort={chipShort}
+          showOps={showOps}
           canViewAs={canUseViewAs(user.realGrants)}
           viewingAs={user.viewingAs}
           workspaces={ws.workspaces}

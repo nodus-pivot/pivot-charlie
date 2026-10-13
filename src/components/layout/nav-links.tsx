@@ -10,10 +10,10 @@ const LINKS = [
 ] as const;
 
 /** Uppercase, tracked; the active one is ink with a 1px gold underline. */
-export function NavLinks({ showOps }: { showOps: boolean }) {
+export function NavLinks({ showOps, className }: { showOps: boolean; className?: string }) {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-5 sm:gap-7">
+    <nav className={cn("flex items-center gap-5 sm:gap-7", className)}>
       {LINKS.filter((l) => !("opsOnly" in l) || showOps).map((l) => {
         const active = pathname === l.href || pathname.startsWith(`${l.href}/`);
         return (

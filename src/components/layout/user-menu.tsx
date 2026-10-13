@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CaretDown, Eye, SignOut, UserCircle } from "@phosphor-icons/react";
+import { CaretDown, Eye, SignOut, SquaresFour, UserCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { clearViewAs, setViewAs, signOut } from "@/features/auth/actions";
 import { VIEW_AS_ROLES, type ViewAs } from "@/features/auth/view-as";
@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   chip: string;
+  /** Without the workspace, for narrow screens. */
+  chipShort: string;
+  showOps: boolean;
   canViewAs: boolean;
   viewingAs: ViewAs | null;
   workspaces: Workspace[];
@@ -25,7 +28,7 @@ const select =
  * The "Nodus · Rane · Watchmaker" chip opens a small panel: Account, View as
  * (owners and admins), Sign out. A native popover, no dialog library.
  */
-export function UserMenu({ chip, canViewAs, viewingAs, workspaces, brands }: Props) {
+export function UserMenu({ chip, chipShort, showOps, canViewAs, viewingAs, workspaces, brands }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -73,11 +76,12 @@ export function UserMenu({ chip, canViewAs, viewingAs, workspaces, brands }: Pro
         aria-expanded={open}
         aria-haspopup="menu"
         className={cn(
-          "flex max-w-[44vw] items-center gap-2 whitespace-nowrap text-xs uppercase tracking-label transition-colors sm:max-w-none",
+          "flex max-w-full items-center gap-2 whitespace-nowrap text-xs uppercase tracking-label transition-colors",
           viewingAs ? "text-amber" : "text-ink-3 hover:text-ink-2",
         )}
       >
-        <span className="truncate">{chip}</span>
+        <span className="truncate sm:hidden">{chipShort}</span>
+        <span className="hidden truncate sm:inline">{chip}</span>
         <CaretDown size={12} aria-hidden className="shrink-0" />
       </button>
 
@@ -131,6 +135,14 @@ export function UserMenu({ chip, canViewAs, viewingAs, workspaces, brands }: Pro
             </div>
           ) : (
             <ul className="flex flex-col">
+              {[{ href: "/service-center", label: "Service Center" }, ...(showOps ? [{ href: "/ops", label: "Ops" }] : [])].map((l) => (
+                <li key={l.href} className="sm:hidden">
+                  <Link href={l.href} onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-ink-2 hover:bg-ground hover:text-ink">
+                    <SquaresFour size={16} /> {l.label}
+                  </Link>
+                </li>
+              ))}
+              <li className="sm:hidden" aria-hidden><hr className="my-1 border-rule" /></li>
               <li>
                 <Link href="/account" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-ink-2 hover:bg-ground hover:text-ink">
                   <UserCircle size={16} /> Account
