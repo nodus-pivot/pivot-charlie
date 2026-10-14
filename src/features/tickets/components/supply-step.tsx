@@ -2,13 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, ArrowUUpLeft, Check, CheckCircle, Info, Package, PaperPlaneTilt, Plus, X } from "@phosphor-icons/react";
+import { ArrowRight, ArrowUUpLeft, Info, PaperPlaneTilt, Plus, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { COMPONENT_LABELS, type Component } from "@/features/pipeline";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { addSparePart, advanceTicket, markPartArrived, removeSparePart, requestParts, saveStageNote, sendBack, setPartHave } from "../actions";
+import { addSparePart, advanceTicket, removeSparePart, requestParts, saveStageNote, sendBack, setPartHave } from "../actions";
 import type { FitPart } from "../detail";
 
 export type SupplyRow = {
@@ -68,19 +68,6 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
         patchRow(r.id, before);
         setError(res.error);
       }
-    });
-  }
-
-  function arrived(r: SupplyRow) {
-    setError(null);
-    const at = new Date().toISOString();
-    patchRow(r.id, { arrivedAt: at });
-    save(async () => {
-      const res = await markPartArrived(number, r.id);
-      if (!res.ok) {
-        patchRow(r.id, { arrivedAt: null });
-        setError(res.error);
-      } else router.refresh();
     });
   }
 
@@ -156,7 +143,7 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
           <PaperPlaneTilt size={13} className={lastMessage.slack && !lastMessage.slack.ok ? "text-amber" : "text-green"} aria-hidden />
           {lastMessage.slack ? (lastMessage.slack.ok ? "Posted to Slack" : "Slack didn't get it") : "Request logged"} · {lastMessage.date}
           <span className="normal-case tracking-normal text-ink-2">&ldquo;{lastMessage.body}&rdquo;</span>
-          {lastMessage.slack && !lastMessage.slack.ok ? <span role="alert" className="basis-full normal-case tracking-normal text-amber">{lastMessage.slack.error} The watch is still parked; use &ldquo;Post to Slack again&rdquo; once it&rsquo;s fixed.</span> : null}
+          {lastMessage.slack && !lastMessage.slack.ok ? <span role="alert" className="basis-full normal-case tracking-normal text-amber">{lastMessage.slack.error} The watch is still marked waiting; press Request parts on Slack again once it&rsquo;s fixed.</span> : null}
         </span>
       ) : (
         <span className="text-[11px] uppercase tracking-label text-ink-3">Parts this repair needs · from Inspect</span>
@@ -168,31 +155,13 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
         <div className="flex flex-col">
           {rows.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule py-3 first:border-t-0">
-              {parked ? (
-                inHand(r) ? (
-                  r.haveIt ? <Check size={16} className="text-green" aria-label="had it" /> : <CheckCircle size={16} className="text-green" aria-label="arrived" />
-                ) : (
-                  <Package size={16} className="text-amber" aria-label="waiting" />
-                )
-              ) : (
-                <span className="w-[90px] text-[15px] font-medium text-ink">{r.findingId ? COMPONENT_LABELS[r.component] : "Extra"}</span>
-              )}
+              <span className="w-[90px] text-[15px] font-medium text-ink">{r.findingId ? COMPONENT_LABELS[r.component] : "Extra"}</span>
               <span className="min-w-0 flex-1 text-[15px] text-ink-2">
                 {r.qty > 1 ? `${r.qty}× ` : ""}
                 {display(r)} <span className="font-mono text-xs text-ink-3">{r.sku}</span>
                 {r.requestedAt && !inHand(r) ? <span className="ml-2 text-xs text-amber">· requested {formatDate(r.requestedAt)}</span> : null}
               </span>
-              {parked ? (
-                r.haveIt ? (
-                  <span className="text-[13px] text-green">Had it</span>
-                ) : r.arrivedAt ? (
-                  <span className="text-[13px] text-green">Arrived {formatDate(r.arrivedAt)}</span>
-                ) : canAct ? (
-                  <Button size="sm" variant="primary" onClick={() => arrived(r)}>Mark arrived</Button>
-                ) : (
-                  <span className="text-[13px] text-amber">waiting</span>
-                )
-              ) : (
+              {canAct ? (
                 <Segmented
                   value={inHand(r) ? "have" : "need"}
                   options={[{ value: "have", label: "Have it" }, { value: "need", label: "Need it" }]}
@@ -200,6 +169,8 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
                   aria-label={`${display(r)} in hand?`}
                   className={cn(!inHand(r) && "[&_[aria-checked=true]]:bg-amber/14 [&_[aria-checked=true]]:text-amber")}
                 />
+              ) : (
+                <span className={cn("text-[13px]", inHand(r) ? "text-green" : "text-amber")}>{inHand(r) ? "In hand" : "Needed"}</span>
               )}
               {!r.findingId && canAct && !r.requestedAt ? (
                 <button type="button" onClick={() => removeSpare(r)} className="text-ink-3 hover:text-coral" aria-label={`Remove ${display(r)}`}><X size={12} /></button>
@@ -237,7 +208,7 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
 
       <p className="flex items-start gap-2 text-[13px] text-ink-3">
         <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
-        {requested ? "Mark each part as it arrives. Fix unlocks when the last one is in." : "You keep parts at your bench and Pivot doesn't track that stock, so mark what you have in hand."}
+        {requested ? "Flip a part to Have it when it arrives. Fix unlocks when the last one is in hand." : "You keep parts at your bench and Pivot doesn't track that stock, so mark what you have in hand."}
       </p>
 
       <label className="flex h-11 items-center border-b border-border-strong focus-within:border-gold">
@@ -254,17 +225,17 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
 
       {canAct ? (
         <div className="flex flex-col gap-3">
-          {!parked && missing.length > 0 ? (
+          {missing.length > 0 ? (
             <div className="flex flex-wrap items-center gap-3.5">
               <Button variant="primary" disabled={pending} onClick={message}>
                 {pending ? "Posting…" : "Request parts on Slack"} {pending ? null : <ArrowRight size={14} />}
               </Button>
-              <span className="text-[13px] text-ink-3">Posts the list to the {brandName} Slack channel and parks this watch in Waiting for parts.</span>
+              <span className="text-[13px] text-ink-3">Posts what&rsquo;s still needed to the {brandName} Slack channel{requested ? ". Post as often as you need to nudge." : " and marks this watch as waiting for parts."}</span>
             </div>
           ) : null}
           <div className="flex flex-wrap items-center gap-3.5">
             <Button variant={missing.length ? "secondary" : "primary"} disabled={pending || missing.length > 0} onClick={toFix}>
-              {requested ? "All arrived" : "All in hand"} <ArrowRight size={14} /> Fix
+              All in hand <ArrowRight size={14} /> Fix
             </Button>
             {missing.length ? (
               <span className="text-[13px] text-ink-3">
@@ -273,9 +244,6 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
             ) : null}
             {error ? <span role="alert" className="text-[13px] text-coral">{error}</span> : null}
             <span className="ml-auto flex items-center gap-4">
-              {parked && missing.length ? (
-                <button type="button" onClick={message} disabled={pending} className="text-[13px] text-ink-2 hover:text-ink">{pending ? "Posting…" : "Post to Slack again"}</button>
-              ) : null}
               <button type="button" onClick={back} disabled={pending} className="flex items-center gap-1.5 text-[13px] text-ink-2 hover:text-ink">
                 <ArrowUUpLeft size={13} /> Back to Inspect
               </button>
