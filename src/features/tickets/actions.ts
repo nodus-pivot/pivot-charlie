@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
+import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -273,27 +274,48 @@ export async function markPartArrived(number: string, rowId: string): Promise<Ac
 }
 
 /** Stamp requested_at on every part still needed and log the message to the brand rep. Parks the ticket (derived). */
-export async function requestParts(number: string): Promise<ActionResult & { message?: string }> {
+export type RequestPartsResult = ActionResult & { slack?: { ok: boolean; error?: string } };
+
+/**
+ * Parks the watch and posts the parts list to Slack: who asked, for which
+ * ticket, customer and watch, then every part still needed. A Slack failure
+ * never undoes the request; it is recorded on the event and shown on the step.
+ */
+export async function requestParts(number: string): Promise<RequestPartsResult> {
   const t = await loadForSupply(number);
   if (!t.ok) return t;
-  const { data: rows } = await t.supabase
-    .from("ticket_parts")
-    .select("id, qty, label, part:parts(name, sku)")
-    .eq("ticket_id", t.id)
-    .eq("have_it", false)
-    .is("arrived_at", null);
+  const [{ data: rows }, { data: ticket }, user] = await Promise.all([
+    t.supabase.from("ticket_parts").select("id, qty, label, finding_id, part:parts(name, sku)").eq("ticket_id", t.id).eq("have_it", false).is("arrived_at", null).order("created_at"),
+    t.supabase.from("tickets").select("customer_name, supply_note, watch:watches(name)").eq("id", t.id).maybeSingle(),
+    getCurrentUser(),
+  ]);
   if (!rows?.length) return { ok: false, error: "Every part is in hand already." };
   const now = new Date().toISOString();
   const { error } = await t.supabase.from("ticket_parts").update({ requested_at: now }).in("id", rows.map((r) => r.id));
   if (error) return { ok: false, error: message(error) };
-  const list = rows.map((r) => {
+
+  const parts = rows.map((r) => {
     const part = r.part as unknown as { name: string; sku: string } | null;
-    return `${r.qty}× ${r.label ?? part?.name ?? "part"}${part?.sku ? ` ${part.sku}` : ""}`;
+    return { name: r.label ?? part?.name ?? "part", sku: part?.sku ?? null, qty: r.qty, spare: !r.finding_id };
   });
-  const body = `Need ${list.join(", ")} for ${t.number}`;
-  await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "parts_requested", actor_id: t.userId, body, payload: { part_rows: rows.map((r) => r.id) } });
+  const watchName = (ticket?.watch as unknown as { name: string } | null)?.name ?? "watch";
+  const body = `Need ${parts.map((p) => `${p.qty}× ${p.name}${p.sku ? ` ${p.sku}` : ""}`).join(", ")} for ${t.number}`;
+
+  const who = user?.profile.display_name ?? "A watchmaker";
+  const link = `${appUrl()}/service-center/tickets/${t.number}`;
+  const lines = [
+    `:wrench: *Parts request* from ${mrkdwn(who)}`,
+    `<${link}|${t.number}> · ${mrkdwn(ticket?.customer_name ?? "")} · ${mrkdwn(watchName)}`,
+    "",
+    ...parts.map((p) => `• ${mrkdwn(p.name)}${p.sku ? ` — \`${p.sku}\`` : ""} × ${p.qty}${p.spare ? "  _(spare, not from a finding)_" : ""}`),
+  ];
+  if (ticket?.supply_note) lines.push("", `> ${mrkdwn(ticket.supply_note).replace(/\n/g, "\n> ")}`);
+  const slack = await postSlack(lines.join("\n"));
+  const slackPayload = slack.ok ? { ok: true, ts: slack.ts } : { ok: false, error: slack.error };
+
+  await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "parts_requested", actor_id: t.userId, body, payload: { part_rows: rows.map((r) => r.id), slack: slackPayload } });
   refresh(number);
-  return { ok: true, message: body };
+  return { ok: true, slack: slackPayload };
 }
 
 const spareInput = z.object({ partId: z.uuid(), label: z.string().trim().max(120).nullable(), qty: z.number().int().min(1).max(20) });

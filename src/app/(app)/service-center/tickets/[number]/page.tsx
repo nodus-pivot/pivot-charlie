@@ -77,7 +77,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
           arrivedAt: p.arrived_at,
         }))}
         fits={detail.fits}
-        messages={detail.events.filter((e) => e.type === "parts_requested" && e.body).map((e) => ({ date: formatDate(e.created_at), body: e.body! }))}
+        messages={detail.events.filter((e) => e.type === "parts_requested" && e.body).map((e) => ({ date: formatDate(e.created_at), body: e.body!, slack: ((e.payload as { slack?: { ok: boolean; error?: string } } | null)?.slack) ?? null }))}
         note={t.supply_note ?? ""}
         brandName={brands.find((b) => b.id === t.brand_id)?.name ?? "brand"}
         canAct={canAct}

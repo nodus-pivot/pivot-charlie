@@ -8,6 +8,19 @@ import "server-only";
 
 export type SlackResult = { ok: true; ts: string } | { ok: false; error: string };
 
+/** Absolute app origin for links in messages. */
+export function appUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return vercel ? `https://${vercel}` : "https://pivot-charlie.vercel.app";
+}
+
+/** Escape the three characters Slack's mrkdwn treats specially. */
+export function mrkdwn(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function slackConfig(): { configured: boolean; channel: string | null } {
   const token = process.env.SLACK_BOT_TOKEN?.trim();
   const channel = process.env.SLACK_CHANNEL_ID?.trim() || null;

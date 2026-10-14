@@ -28,7 +28,7 @@ type Props = {
   number: string;
   rows: SupplyRow[];
   fits: FitPart[];
-  messages: { date: string; body: string }[];
+  messages: { date: string; body: string; slack: { ok: boolean; error?: string } | null }[];
   note: string;
   brandName: string;
   canAct: boolean;
@@ -151,9 +151,10 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
     <>
       {requested && lastMessage ? (
         <span className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-label text-ink-3">
-          <PaperPlaneTilt size={13} className="text-green" aria-hidden />
-          Message sent to {brandName} rep · {lastMessage.date}
+          <PaperPlaneTilt size={13} className={lastMessage.slack && !lastMessage.slack.ok ? "text-amber" : "text-green"} aria-hidden />
+          {lastMessage.slack ? (lastMessage.slack.ok ? "Posted to Slack" : "Slack didn't get it") : "Request logged"} · {lastMessage.date}
           <span className="normal-case tracking-normal text-ink-2">&ldquo;{lastMessage.body}&rdquo;</span>
+          {lastMessage.slack && !lastMessage.slack.ok ? <span role="alert" className="basis-full normal-case tracking-normal text-amber">{lastMessage.slack.error} The watch is still parked; use &ldquo;Post to Slack again&rdquo; once it&rsquo;s fixed.</span> : null}
         </span>
       ) : (
         <span className="text-[11px] uppercase tracking-label text-ink-3">Parts this repair needs · from Inspect</span>
@@ -254,9 +255,9 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
           {!parked && missing.length > 0 ? (
             <div className="flex flex-wrap items-center gap-3.5">
               <Button variant="primary" disabled={pending} onClick={message}>
-                Message for parts <ArrowRight size={14} />
+                {pending ? "Posting…" : "Request parts on Slack"} {pending ? null : <ArrowRight size={14} />}
               </Button>
-              <span className="text-[13px] text-ink-3">Sends the {brandName} rep the list and parks this watch in Waiting for parts.</span>
+              <span className="text-[13px] text-ink-3">Posts the list to the {brandName} Slack channel and parks this watch in Waiting for parts.</span>
             </div>
           ) : null}
           <div className="flex flex-wrap items-center gap-3.5">
@@ -271,7 +272,7 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
             {error ? <span role="alert" className="text-[13px] text-coral">{error}</span> : null}
             <span className="ml-auto flex items-center gap-4">
               {parked && missing.length ? (
-                <button type="button" onClick={message} disabled={pending} className="text-[13px] text-ink-2 hover:text-ink">Send another message</button>
+                <button type="button" onClick={message} disabled={pending} className="text-[13px] text-ink-2 hover:text-ink">{pending ? "Posting…" : "Post to Slack again"}</button>
               ) : null}
               <button type="button" onClick={back} disabled={pending} className="flex items-center gap-1.5 text-[13px] text-ink-2 hover:text-ink">
                 <ArrowUUpLeft size={13} /> Back to Inspect
