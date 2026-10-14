@@ -7,6 +7,7 @@ import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { isOwner } from "@/features/pipeline";
 import { WorkspaceSettings } from "@/features/workspaces/components/workspace-settings";
 import { getWorkspaceContext, listWorkspaceBrands } from "@/features/workspaces/queries";
+import { slackConfig } from "@/lib/slack";
 
 export const metadata: Metadata = { title: "Workspace" };
 
@@ -19,7 +20,7 @@ export default async function WorkspacePage() {
   return (
     <>
       <PageBand eyebrow={`${ws.current.name} · ${first}`} title="Workspace" />
-      <WorkspaceSettings key={ws.current.id} workspace={ws.current} brands={brands} isOwner={isOwner(user.realGrants)} />
+      <WorkspaceSettings key={ws.current.id} workspace={ws.current} brands={brands} isOwner={isOwner(user.realGrants)} slack={slackConfig()} />
     </>
   );
 }

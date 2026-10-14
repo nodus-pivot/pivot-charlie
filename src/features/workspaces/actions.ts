@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/features/auth/queries";
 import { canAdministerWorkspace } from "@/features/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { countryField } from "@/features/intake/schema";
+import { postSlack } from "@/lib/slack";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -120,4 +121,15 @@ export async function setBrandActive(brandId: string, active: boolean): Promise<
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/* ---------------------------------------------------------------- integrations */
+
+/** Posts a hello to the configured Slack channel so an admin can confirm the wiring. */
+export async function sendSlackTest(workspaceId: string): Promise<WsResult> {
+  if (!z.uuid().safeParse(workspaceId).success) return { ok: false, error: "Reload and try again." };
+  const ctx = await adminContext(workspaceId);
+  if (!ctx.ok) return ctx;
+  const r = await postSlack(`:wave: Pivot test from ${ctx.user.profile.display_name}. If you can read this, Pivot can post here.`);
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

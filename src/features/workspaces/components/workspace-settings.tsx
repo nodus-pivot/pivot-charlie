@@ -9,7 +9,7 @@ import { CountrySelect } from "@/components/ui/country-select";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import type { Address } from "@/lib/address";
 import { cn } from "@/lib/utils";
-import { createBrand, renameBrand, setBrandActive, updateWorkspace, type AddressFields } from "../actions";
+import { createBrand, renameBrand, sendSlackTest, setBrandActive, updateWorkspace, type AddressFields } from "../actions";
 import type { BrandSummary, Workspace } from "../queries";
 
 const field = "h-10 w-full border-b border-border-strong bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none";
@@ -20,7 +20,7 @@ function fields(a: Address | null | undefined): AddressFields {
 }
 
 /** Ops › Workspace: operating details, the two addresses that tickets use, and the brands. */
-export function WorkspaceSettings({ workspace, brands, isOwner }: { workspace: Workspace; brands: BrandSummary[]; isOwner: boolean }) {
+export function WorkspaceSettings({ workspace, brands, isOwner, slack }: { workspace: Workspace; brands: BrandSummary[]; isOwner: boolean; slack: { configured: boolean; channel: string | null } }) {
   const router = useRouter();
   const [name, setName] = useState(workspace.name);
   const [prefix, setPrefix] = useState(workspace.ticket_prefix);
@@ -70,6 +70,7 @@ export function WorkspaceSettings({ workspace, brands, isOwner }: { workspace: W
       </form>
 
       <Brands workspaceId={workspace.id} brands={brands} isOwner={isOwner} />
+      <Integrations workspaceId={workspace.id} slack={slack} />
     </section>
   );
 }
@@ -160,6 +161,35 @@ function Brands({ workspaceId, brands, isOwner }: { workspaceId: string; brands:
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function Integrations({ workspaceId, slack }: { workspaceId: string; slack: { configured: boolean; channel: string | null } }) {
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+  function test() {
+    setResult(null);
+    start(async () => {
+      const r = await sendSlackTest(workspaceId);
+      setResult(r.ok ? { ok: true, text: "Posted. Check the channel." } : { ok: false, text: r.error });
+    });
+  }
+  return (
+    <div className="flex max-w-[980px] flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <Eyebrow>Integrations</Eyebrow>
+        <p className="text-[13px] text-ink-3">Parts requests and customer address changes post to one Slack channel. The token and channel live in the hosting settings, not here.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-4 border-t border-b border-rule py-3.5">
+        <span className="flex flex-1 items-baseline gap-3">
+          <span className="font-display text-[22px] font-semibold text-ink">Slack</span>
+          {slack.configured ? <Chip tone="green">configured</Chip> : <Chip tone="amber">not configured</Chip>}
+          {slack.channel ? <span className="font-mono text-xs text-ink-3">{slack.channel}</span> : null}
+        </span>
+        <Button size="sm" disabled={!slack.configured || pending} onClick={test}>{pending ? "Sending…" : "Send a test message"}</Button>
+      </div>
+      {result ? <p role={result.ok ? "status" : "alert"} className={cn("text-[13px]", result.ok ? "text-green" : "text-coral")}>{result.text}</p> : null}
     </div>
   );
 }
