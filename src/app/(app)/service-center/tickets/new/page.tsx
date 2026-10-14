@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
 import { PageBand } from "@/components/layout/page-band";
+import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
+import { countTickets } from "@/features/tickets/queries";
 import { ButtonLink } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { getCurrentUser } from "@/features/auth/queries";
@@ -28,11 +30,12 @@ export default async function NewTicketPage() {
       </section>
     );
   }
-  const catalog = await getCatalog(brand.id);
+  const [catalog, totals] = await Promise.all([getCatalog(brand.id), countTickets(ws.current.id)]);
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
 
   return (
     <>
+      <ServiceCenterTabs active={null} counts={{ bench: totals.open, incoming: null, closed: totals.closed }} />
       <PageBand
         eyebrow={`${ws.current.name} · ${first}`}
         title="New ticket"

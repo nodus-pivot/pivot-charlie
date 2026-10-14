@@ -12,7 +12,8 @@ export function ServiceCenterTabs({
   counts,
   className,
 }: {
-  active: ServiceCenterView;
+  /** null when the page belongs to none of the three, e.g. New ticket. */
+  active: ServiceCenterView | null;
   counts: { bench: number | null; incoming: number | null; closed: number | null };
   className?: string;
 }) {
@@ -22,7 +23,7 @@ export function ServiceCenterTabs({
     { key: "closed", href: "/service-center?view=closed", label: "Closed", count: counts.closed },
   ];
   return (
-    <nav className={cn("flex flex-none gap-7 border-b border-rule bg-panel px-4 text-sm sm:px-8 lg:px-12", className)} aria-label="Service Center views">
+    <nav className={cn("sticky top-12 z-20 flex flex-none gap-7 border-b border-rule bg-panel px-4 text-sm sm:px-8 lg:px-12", className)} aria-label="Service Center views">
       {tabs.map((t) => {
         const on = t.key === active;
         return (

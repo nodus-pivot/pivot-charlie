@@ -16,7 +16,7 @@ export function AppNav({ user, ws, brands }: { user: CurrentUser; ws: WorkspaceC
   const chipShort = chip.split(" · ").slice(-2).join(" · ");
   const showOps = canOpenOps(user.grants);
   return (
-    <header className="flex h-12 min-w-0 flex-none items-center gap-5 border-b border-rule bg-panel px-4 text-xs uppercase tracking-label text-ink-3 sm:gap-7 sm:px-8 lg:px-12">
+    <header className="sticky top-0 z-30 flex h-12 min-w-0 flex-none items-center gap-5 border-b border-rule bg-panel px-4 text-xs uppercase tracking-label text-ink-3 sm:gap-7 sm:px-8 lg:px-12">
       <Wordmark href="/service-center" className="text-xl" />
       <NavLinks showOps={showOps} className="hidden sm:flex" />
       <div className="ml-auto min-w-0">

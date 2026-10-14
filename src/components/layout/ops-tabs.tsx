@@ -17,7 +17,7 @@ export function OpsTabs({ show }: { show: OpsView[] }) {
     { key: "workspace", href: "/ops/workspace", label: "Workspace" },
   ];
   return (
-    <nav className="flex flex-none gap-7 border-b border-rule bg-panel px-4 text-sm sm:px-8 lg:px-12" aria-label="Ops views">
+    <nav className="sticky top-12 z-20 flex flex-none gap-7 border-b border-rule bg-panel px-4 text-sm sm:px-8 lg:px-12" aria-label="Ops views">
       {tabs.filter((t) => show.includes(t.key)).map((t) => {
         const on = t.key === active;
         return (

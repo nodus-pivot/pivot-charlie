@@ -5,6 +5,8 @@ import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { STAGE_LABELS, canActOn, isAdminOf } from "@/features/pipeline";
 import type { Address } from "@/lib/address";
 import { getTicketDetail } from "@/features/tickets/detail";
+import { countTickets } from "@/features/tickets/queries";
+import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
 import { CheckInStep } from "@/features/tickets/components/check-in-step";
 import { InspectStep } from "@/features/tickets/components/inspect-step";
 import { SupplyStep } from "@/features/tickets/components/supply-step";
@@ -25,7 +27,7 @@ export async function generateMetadata({ params }: PageProps<"/service-center/ti
 export default async function TicketPage({ params, searchParams }: PageProps<"/service-center/tickets/[number]">) {
   const [{ number }, sp, user, ws, brands] = await Promise.all([params, searchParams, getCurrentUser(), getWorkspaceContext(), getVisibleBrands()]);
   if (!user) redirect(SIGN_IN_PATH);
-  const detail = await getTicketDetail(number);
+  const [detail, totals] = await Promise.all([getTicketDetail(number), ws.current ? countTickets(ws.current.id) : Promise.resolve(null)]);
   if (!detail) notFound();
   const t = detail.ticket;
   const canAct = canActOn(user.grants, t.stage, t.workspace_id, t.brand_id);
@@ -149,8 +151,11 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
   }
 
   return (
-    <TicketFrame detail={detail} user={user} workspaceName={ws.current?.name ?? "Pivot"} moveFailed={sp.move === "failed"}>
-      {step}
-    </TicketFrame>
+    <>
+      <ServiceCenterTabs active={t.stage === "closed" ? "closed" : "bench"} counts={{ bench: totals?.open ?? null, incoming: null, closed: totals?.closed ?? null }} />
+      <TicketFrame detail={detail} user={user} workspaceName={ws.current?.name ?? "Pivot"} moveFailed={sp.move === "failed"}>
+        {step}
+      </TicketFrame>
+    </>
   );
 }
