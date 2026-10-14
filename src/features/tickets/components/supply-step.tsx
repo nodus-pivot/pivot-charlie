@@ -56,14 +56,16 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
   }
 
+  /** Need it on a part that had arrived forgets the arrival, so it can be requested again. */
   function toggleHave(r: SupplyRow, have: boolean) {
     if (!canAct) return;
     setError(null);
-    patchRow(r.id, { haveIt: have });
+    const before = { haveIt: r.haveIt, arrivedAt: r.arrivedAt, requestedAt: r.requestedAt };
+    patchRow(r.id, have ? { haveIt: true } : { haveIt: false, arrivedAt: null, requestedAt: null });
     save(async () => {
       const res = await setPartHave(number, r.id, have);
       if (!res.ok) {
-        patchRow(r.id, { haveIt: !have });
+        patchRow(r.id, before);
         setError(res.error);
       }
     });
@@ -190,15 +192,13 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
                 ) : (
                   <span className="text-[13px] text-amber">waiting</span>
                 )
-              ) : r.arrivedAt ? (
-                <span className="text-[13px] text-green">Arrived {formatDate(r.arrivedAt)}</span>
               ) : (
                 <Segmented
-                  value={r.haveIt ? "have" : "need"}
+                  value={inHand(r) ? "have" : "need"}
                   options={[{ value: "have", label: "Have it" }, { value: "need", label: "Need it" }]}
                   onChange={(v) => toggleHave(r, v === "have")}
                   aria-label={`${display(r)} in hand?`}
-                  className={cn(!r.haveIt && "[&_[aria-checked=true]]:bg-amber/14 [&_[aria-checked=true]]:text-amber")}
+                  className={cn(!inHand(r) && "[&_[aria-checked=true]]:bg-amber/14 [&_[aria-checked=true]]:text-amber")}
                 />
               )}
               {!r.findingId && canAct && !r.requestedAt ? (

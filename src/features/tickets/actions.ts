@@ -257,7 +257,9 @@ export async function setPartHave(number: string, rowId: string, have: boolean):
   if (!z.uuid().safeParse(rowId).success) return { ok: false, error: "Unknown part row." };
   const t = await loadForSupply(number);
   if (!t.ok) return t;
-  const { error } = await t.supabase.from("ticket_parts").update({ have_it: have }).eq("id", rowId).eq("ticket_id", t.id);
+  // "Need it" also forgets an earlier arrival, so a lost or damaged part can be requested again.
+  const patch = have ? { have_it: true } : { have_it: false, arrived_at: null, requested_at: null };
+  const { error } = await t.supabase.from("ticket_parts").update(patch).eq("id", rowId).eq("ticket_id", t.id);
   if (error) return { ok: false, error: message(error) };
   refresh(number);
   return { ok: true };
