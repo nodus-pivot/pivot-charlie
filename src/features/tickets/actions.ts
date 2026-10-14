@@ -310,6 +310,7 @@ export async function requestParts(number: string): Promise<RequestPartsResult> 
     ...parts.map((p) => `• ${mrkdwn(p.name)}${p.sku ? ` — \`${p.sku}\`` : ""} × ${p.qty}${p.spare ? "  _(spare, not from a finding)_" : ""}`),
   ];
   if (ticket?.supply_note) lines.push("", `> ${mrkdwn(ticket.supply_note).replace(/\n/g, "\n> ")}`);
+  lines.push("", `Open the ticket: ${link}`);
   const slack = await postSlack(lines.join("\n"));
   const slackPayload = slack.ok ? { ok: true, ts: slack.ts } : { ok: false, error: slack.error };
 
