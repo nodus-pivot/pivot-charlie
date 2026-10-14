@@ -190,6 +190,8 @@ export function SupplyStep({ number, rows: initialRows, fits, messages, note, br
                 ) : (
                   <span className="text-[13px] text-amber">waiting</span>
                 )
+              ) : r.arrivedAt ? (
+                <span className="text-[13px] text-green">Arrived {formatDate(r.arrivedAt)}</span>
               ) : (
                 <Segmented
                   value={r.haveIt ? "have" : "need"}
