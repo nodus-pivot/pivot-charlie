@@ -154,7 +154,7 @@ export function FixStep({ number, rows: initialRows, fits, note, benchMinutes, c
                   options={[{ value: "fix", label: "Fix" }, { value: "replace", label: "Replace" }]}
                   onChange={(v) => canAct && !r.doneAt && changePlan(r, v)}
                   aria-label={`Plan for ${COMPONENT_LABELS[r.component]}`}
-                  className={cn(r.doneAt && "opacity-60")}
+                  className={cn("justify-self-start", r.doneAt && "opacity-60")}
                 />
                 <span className="min-w-0 text-[15px] text-ink-2">
                   {r.action === "replace" ? (

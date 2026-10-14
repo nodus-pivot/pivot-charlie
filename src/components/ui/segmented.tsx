@@ -19,7 +19,7 @@ export function Segmented<T extends string>({
   "aria-label"?: string;
 }) {
   return (
-    <span role="radiogroup" aria-label={ariaLabel} className={cn("inline-flex shrink-0 gap-0.5 rounded-xs border border-border-strong p-0.5", className)}>
+    <span role="radiogroup" aria-label={ariaLabel} className={cn("inline-flex shrink-0 gap-0.5 self-start justify-self-start rounded-xs border border-border-strong p-0.5", className)}>
       {options.map((o) => {
         const active = o.value === value;
         return (
