@@ -54,6 +54,33 @@ export async function postSlack(text: string, blocks?: unknown[]): Promise<Slack
   }
 }
 
+export type SlackReplies = { count: number; last: string | null };
+
+/**
+ * Reply count and the newest reply under one of our posts. Needs the
+ * channels:history (or groups:history) scope; without it, or on any other
+ * error, returns null and the stored counts stand.
+ */
+export async function fetchSlackReplies(ts: string): Promise<SlackReplies | null> {
+  const token = process.env.SLACK_BOT_TOKEN?.trim();
+  const channel = process.env.SLACK_CHANNEL_ID?.trim();
+  if (!token || !channel || !ts) return null;
+  try {
+    const url = new URL("https://slack.com/api/conversations.replies");
+    url.searchParams.set("channel", channel);
+    url.searchParams.set("ts", ts);
+    url.searchParams.set("limit", "200");
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(4000) });
+    const data = (await res.json()) as { ok: boolean; error?: string; messages?: { ts: string; text?: string; subtype?: string }[] };
+    if (!data.ok || !data.messages) return null;
+    const replies = data.messages.filter((m) => m.ts !== ts && !m.subtype);
+    const last = replies.at(-1)?.text?.replace(/\s+/g, " ").trim() || null;
+    return { count: replies.length, last: last ? last.slice(0, 140) : null };
+  } catch {
+    return null;
+  }
+}
+
 function friendly(code: string): string {
   switch (code) {
     case "not_in_channel":

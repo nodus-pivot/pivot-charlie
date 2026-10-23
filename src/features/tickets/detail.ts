@@ -3,8 +3,9 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Address } from "@/lib/address";
-import type { Step } from "@/features/pipeline";
+import { STEPS, type Step } from "@/features/pipeline";
 import type { StepRecord } from "./summary";
+import { fetchSlackReplies } from "@/lib/slack";
 
 type Tables = Database["public"]["Tables"];
 export type TicketRow = Tables["tickets"]["Row"];
@@ -40,6 +41,8 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
     ticket.sheet_row_id ? supabase.from("sheet_rows").select("moved_to_tab, moved_at").eq("id", ticket.sheet_row_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
+  const messageRows = await refreshReplies(supabase, messages.data ?? []);
+
   const peopleIds = [
     ...(events.data ?? []).map((e) => e.actor_id),
     ...(steps.data ?? []).map((s) => s.done_by),
@@ -51,8 +54,10 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
 
   return {
     ticket: { ...ticket, ship_to: (ticket.ship_to as Address | null) ?? null },
+    // Rail order, whatever order Postgres returns the rows in (an update moves a row).
     steps: (steps.data ?? [])
       .filter((s) => s.stage !== "closed")
+      .sort((a, b) => STEPS.indexOf(a.stage as Step) - STEPS.indexOf(b.stage as Step))
       .map((s) => ({
         stage: s.stage as Step,
         answer: s.answer,
@@ -62,13 +67,38 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
         skipped: s.skipped,
         updated_at: s.updated_at,
       })),
-    messages: messages.data ?? [],
+    messages: messageRows,
     tests: tests.data ?? [],
     photos: photos.data ?? [],
     events: (events.data ?? []).map((e) => ({ ...e, actor_name: e.actor_id ? (nameOf.get(e.actor_id) ?? null) : null })),
     sheetRow: sheetRow.data ?? null,
   };
 });
+
+const REPLIES_TTL_MS = 2 * 60_000;
+
+/**
+ * The newest Slack post of each kind gets its reply count refreshed when
+ * the stored one is older than two minutes. Errors (no history scope, a
+ * seeded ts) only stamp replies_checked_at so the page never hammers Slack.
+ */
+async function refreshReplies(supabase: Awaited<ReturnType<typeof createClient>>, rows: MessageRow[]): Promise<MessageRow[]> {
+  const now = Date.now();
+  const latestByKind = new Map<string, MessageRow>();
+  for (const m of rows) if (m.channel === "slack" && m.external_id) latestByKind.set(m.kind, m);
+  const stale = [...latestByKind.values()].filter((m) => !m.replies_checked_at || now - new Date(m.replies_checked_at).getTime() > REPLIES_TTL_MS);
+  if (!stale.length) return rows;
+  const updates = await Promise.all(
+    stale.map(async (m) => {
+      const r = await fetchSlackReplies(m.external_id!);
+      const patch = r ? { reply_count: r.count, last_reply: r.last, replies_checked_at: new Date(now).toISOString() } : { replies_checked_at: new Date(now).toISOString() };
+      await supabase.from("ticket_messages").update(patch).eq("id", m.id);
+      return [m.id, { ...m, ...patch }] as const;
+    }),
+  );
+  const byId = new Map(updates);
+  return rows.map((m) => byId.get(m.id) ?? m);
+}
 
 /** Who posted a message, for the Slack card's "Posted · Wes" line. */
 export function messageAuthors(detail: TicketDetail): Map<string, string> {

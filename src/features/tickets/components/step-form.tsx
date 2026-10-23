@@ -222,10 +222,19 @@ export function StepForm(p: StepFormProps) {
             onBlur={blurNotes}
             disabled={!p.canAct}
             rows={p.stage === "test" ? 2 : 4}
+            autoFocus={editingList}
             placeholder={noteSpec.placeholder}
             className="min-h-24 w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none"
           />
         </label>
+      ) : null}
+
+      {p.stage === "supply" && editingList && p.slack ? (
+        <div className="flex flex-wrap items-center gap-3.5">
+          <Button size="sm" variant="primary" disabled={pending || !notes.trim()} onClick={post}>Post updated list on Slack</Button>
+          <Button size="sm" variant="ghost" disabled={pending} onClick={() => { setNotes(p.notes); setEditingList(false); }}>Cancel</Button>
+          <span className="text-[13px] text-ink-3">Posts the list again as a new message; the old one stays in Slack.</span>
+        </div>
       ) : null}
 
       {showSlack && p.slack && slackParts ? (
@@ -242,7 +251,7 @@ export function StepForm(p: StepFormProps) {
           replies={p.slack.replies}
           replyNote={p.slack.lastReply ? `“${p.slack.lastReply}”` : p.stage === "inspect" ? "Customer service asks the customer, then replies here." : null}
           failed={p.slack.failed}
-          onEdit={p.canAct && p.stage === "supply" ? () => setEditingList((v) => !v) : undefined}
+          onEdit={p.canAct && p.stage === "supply" && !editingList ? () => setEditingList(true) : undefined}
           onRepost={p.canAct ? post : undefined}
           busy={pending}
         />
