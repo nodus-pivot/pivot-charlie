@@ -12,6 +12,7 @@ import { Dossier, type DossierData } from "./dossier";
 import { StepRail } from "./step-rail";
 import { ClosedView } from "./closed-view";
 import { AddressRequest } from "./address-request";
+import { ParkedBanner } from "./parked-banner";
 import type { Address } from "@/lib/address";
 import { photoUrl } from "@/lib/photos";
 
@@ -61,8 +62,7 @@ export function TicketFrame({
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
   const currentExtras = parked
     ? {
-        badge: <Chip tone={parked.kind === "waiting_for_parts" ? "amber" : "coral"}>{parked.kind === "waiting_for_parts" ? "waiting for parts" : "parked"}</Chip>,
-        aside: parked.since ? `${parked.kind === "waiting_for_parts" ? "waiting" : "parked"} ${daysBetween(parked.since)}d` : undefined,
+        badge: <Chip tone={parked.kind === "waiting_for_parts" ? "amber" : "coral"}>{parked.kind === "waiting_for_parts" ? `waiting ${parked.since ? daysBetween(parked.since) : 0}d` : "parked"}</Chip>,
       }
     : undefined;
   const editable = (t.stage === "check_in" && canActOn(user.grants, "check_in", t.workspace_id, t.brand_id)) || isAdminOf(user.grants, t.workspace_id);
@@ -100,14 +100,7 @@ export function TicketFrame({
           </span>
         }
       />
-      {parked ? (
-        <p className={cn("flex flex-wrap items-center gap-3 border-b px-4 py-2 text-[13px] sm:px-8 lg:px-12", parked.kind === "waiting_for_parts" ? "border-amber/40 bg-amber/10 text-amber" : "border-coral/40 bg-coral/10 text-coral")}>
-          {parked.kind === "waiting_for_parts"
-            ? "Parked. Waiting on parts from Nodus; the request is on Slack."
-            : "Parked. Could not replicate the reported issue. Nodus customer service is following up with the customer on Slack."}
-          {parked.since ? <span className="ml-auto text-ink-3">since {formatDate(parked.since)} · {daysBetween(parked.since)}d</span> : null}
-        </p>
-      ) : null}
+      {parked ? <ParkedBanner parked={parked} /> : null}
       {moveFailed || (detail.sheetRow && !detail.sheetRow.moved_at) ? (
         <p className="flex items-center gap-3 border-b border-amber/40 bg-amber/10 px-4 py-2 text-[13px] text-amber sm:px-8 lg:px-12">
           The ticket is here, but its row did not move in the Google Sheet.{" "}

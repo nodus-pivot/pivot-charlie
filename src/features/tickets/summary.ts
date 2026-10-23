@@ -112,7 +112,7 @@ export function parkedState(t: SummaryInput): Parked | null {
 
 /** The band's trailing line: "Sector GMT · NW260003 · in Supply · waiting for parts". */
 export function statusWord(t: { stage: Stage; closed_at: string | null; parked: Parked | null; awaiting_payment: boolean }, now: Date = new Date()): { text: string; tone: "gold" | "amber" | "green" | "coral" } {
-  if (t.stage === "closed") return { text: `closed ${formatDate(t.closed_at, now)}`, tone: "green" };
+  if (t.stage === "closed") return { text: `closed · ${formatDate(t.closed_at, now)}`, tone: "green" };
   if (t.parked?.kind === "cannot_replicate") return { text: "parked · cannot replicate", tone: "coral" };
   if (t.parked?.kind === "waiting_for_parts") return { text: "waiting for parts", tone: "amber" };
   if (t.awaiting_payment) return { text: "awaiting payment", tone: "amber" };

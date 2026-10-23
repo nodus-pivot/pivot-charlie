@@ -14,7 +14,7 @@ export function StepRail({ steps, current, children }: { steps: StepRow[]; curre
       {steps.map((s) => (
         <div
           key={s.stage}
-          className={cn("flex flex-col gap-4 border-t py-3.5", s.state === "current" ? "border-gold pb-6" : "border-rule")}
+          className={cn("flex flex-col border-t", s.state === "current" ? "gap-[18px] border-gold pb-6 pt-[22px]" : "gap-4 border-rule py-3.5")}
           aria-current={s.state === "current" ? "step" : undefined}
         >
           <div className="flex items-baseline gap-3.5">

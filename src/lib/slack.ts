@@ -27,6 +27,13 @@ export function slackConfig(): { configured: boolean; channel: string | null } {
   return { configured: !!token && !!channel, channel };
 }
 
+/** "#nodus-service" for the Slack card: SLACK_CHANNEL_NAME when set, else the channel id. */
+export function slackChannelName(): string | null {
+  const name = process.env.SLACK_CHANNEL_NAME?.trim();
+  if (name) return name.startsWith("#") ? name : `#${name}`;
+  return process.env.SLACK_CHANNEL_ID?.trim() || null;
+}
+
 /** Plain text (mrkdwn) with optional Block Kit blocks. */
 export async function postSlack(text: string, blocks?: unknown[]): Promise<SlackResult> {
   const token = process.env.SLACK_BOT_TOKEN?.trim();

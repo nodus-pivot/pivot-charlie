@@ -11,7 +11,8 @@ import { ServiceCenterTabs } from "@/components/layout/service-center-tabs";
 import { StepForm } from "@/features/tickets/components/step-form";
 import { TicketFrame } from "@/features/tickets/components/ticket-frame";
 import { getWorkspaceContext } from "@/features/workspaces/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatTime } from "@/lib/format";
+import { slackChannelName } from "@/lib/slack";
 
 export async function generateMetadata({ params }: PageProps<"/service-center/tickets/[number]">): Promise<Metadata> {
   const { number } = await params;
@@ -55,7 +56,10 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
           previousFails: detail.tests.filter((x) => x.attempt < t.test_attempt && x.result === "fail").map((x) => ({ attempt: x.attempt, kind: x.kind as TestKind, note: x.note })),
         }}
         ship={{ carrier: t.ship_carrier ?? "", tracking: t.ship_tracking ?? "", labelUrl: t.label_url ?? "", shipToLine: shipTo ? [shipTo.name, addressInline(shipTo)].filter(Boolean).join(" · ") : null }}
-        slack={post ? { postedAt: formatDateTime(post.created_at), by: (post.created_by && authors.get(post.created_by)) || "Pivot", body: post.body, replies: post.reply_count, lastReply: post.last_reply, failed: post.status === "failed" ? (post.error ?? "unknown error") : null } : null}
+        customer={t.customer_name}
+        watch={t.watch}
+        slackChannel={slackChannelName()}
+        slack={post ? { postedAt: `${formatDate(post.created_at)} · ${formatTime(post.created_at)}`, by: ((post.created_by && authors.get(post.created_by)) || "Pivot").split(/\s+/)[0], body: post.body, replies: post.reply_count, lastReply: post.last_reply, failed: post.status === "failed" ? (post.error ?? "unknown error") : null } : null}
         canAct={canAct}
         isAdmin={isAdminOf(user.grants, t.workspace_id)}
       />
