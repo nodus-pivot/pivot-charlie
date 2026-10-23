@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Grant } from "@/features/pipeline";
-import { buildBench, nextAction, waitingWord, type BenchRow } from "./bench";
+import { buildBench, buildClosed, nextAction, type BenchRow } from "./bench";
 
 const WS = "ws";
 const BRAND = "brand";
 const rane: Grant[] = [{ role: "watchmaker", workspace_id: null, brand_id: BRAND }];
 const rep: Grant[] = [{ role: "brand_rep", workspace_id: null, brand_id: BRAND }];
-const now = new Date("2026-10-09T18:00:00Z");
+const now = new Date("2026-10-23T18:00:00Z");
 
 function row(over: Partial<BenchRow> & { number: string; stage: BenchRow["stage"]; daysAgo: number }): BenchRow {
   const { daysAgo, ...rest } = over;
@@ -15,53 +15,55 @@ function row(over: Partial<BenchRow> & { number: string; stage: BenchRow["stage"
     workspace_id: WS,
     brand_id: BRAND,
     customer_name: "Someone Here",
-    watch_name: "Sector Deep",
+    watch: "Sector Deep",
     priority: false,
     needs_payment: false,
+    payment_amount: null,
+    invoice_sent_at: null,
     payment_received: false,
     return_to_everett: false,
+    coverage: "warranty",
     stage_entered_at: new Date(now.getTime() - daysAgo * 86_400_000).toISOString(),
     closed_at: null,
     parked: false,
-    waiting_on: null,
+    waiting_for_parts: false,
     parts_requested_at: null,
-    findings_total: 0,
-    findings_done: 0,
-    parts_total: 0,
-    parts_in_hand: 0,
+    parts_list: null,
+    awaiting_payment: false,
     tests_passed: 0,
     ship_ready: false,
+    outcome: null,
+    slack_replies: null,
     bench_photo_path: null,
-    undone: [],
     tests_left: [],
     ...rest,
   };
 }
 
 const rows: BenchRow[] = [
-  row({ number: "NW260001", stage: "check_in", daysAgo: 30, customer_name: "Dana Whitmore" }),
-  row({ number: "NW260002", stage: "inspect", daysAgo: 24, customer_name: "Maria Lopez" }),
-  row({ number: "NW260003", stage: "supply", daysAgo: 22, customer_name: "James Whitfield", parked: true, waiting_on: "Dial, Sector GMT", parts_requested_at: "2026-10-02T12:00:00Z", parts_total: 2, parts_in_hand: 1 }),
-  row({ number: "NW260004", stage: "fix", daysAgo: 12, customer_name: "Adam Ferguson", priority: true, findings_total: 3, findings_done: 1, undone: ["case", "gaskets"] }),
-  row({ number: "NW260005", stage: "test", daysAgo: 6, customer_name: "Sarah Chen", tests_passed: 2, tests_left: ["looks"] }),
-  row({ number: "NW260006", stage: "ship", daysAgo: 1, customer_name: "Leo Park" }),
+  row({ number: "NW260011", stage: "check_in", daysAgo: 9, customer_name: "Michael Becker" }),
+  row({ number: "NW260009", stage: "inspect", daysAgo: 1, customer_name: "Owen Brooks", parked: true, slack_replies: 1 }),
+  row({ number: "NW260003", stage: "supply", daysAgo: 5, customer_name: "James Whitfield", waiting_for_parts: true, parts_requested_at: "2026-10-18T12:00:00Z" }),
+  row({ number: "NW260016", stage: "repair", daysAgo: 8, customer_name: "Tyler McDonald" }),
+  row({ number: "NW260002", stage: "test", daysAgo: 4, customer_name: "Maria Lopez", tests_passed: 3 }),
+  row({ number: "NW260004", stage: "test", daysAgo: 3, customer_name: "Adam Ferguson", priority: true, tests_left: ["time", "water", "looks"] }),
+  row({ number: "NW260005", stage: "payment", daysAgo: 12, customer_name: "Sarah Chen", needs_payment: true, payment_amount: 180, invoice_sent_at: "2026-10-11T12:00:00Z", awaiting_payment: true }),
+  row({ number: "NW260006", stage: "ship", daysAgo: 1, customer_name: "Leo Park", ship_ready: true }),
+  row({ number: "NW260001", stage: "check_in", daysAgo: 20, customer_name: "Old Timer" }),
 ];
 
 describe("nextAction", () => {
-  it("names the thing to do next", () => {
-    expect(rows.map((r) => nextAction(r).label)).toEqual([
-      "Confirm check in",
-      "Finish inspection",
-      "Mark dial arrived",
-      "Mark Case done",
-      "Run Looks check",
-      "Print label",
+  it("names the single thing to do next, like D0", () => {
+    expect(rows.slice(0, 8).map((r) => nextAction(r).label)).toEqual([
+      "I have the watch",
+      "Open ticket",
+      "Parts received?",
+      "Mark repaired",
+      "Tests passed",
+      "Run Timekeeping check",
+      "Payment received",
+      "Shipped",
     ]);
-  });
-  it("takes the part word before the comma", () => {
-    expect(waitingWord("Dial, Sector GMT")).toBe("dial");
-    expect(waitingWord("Spare casetube")).toBe("spare casetube");
-    expect(waitingWord(null)).toBe("part");
   });
 });
 
@@ -69,33 +71,53 @@ describe("buildBench", () => {
   const bench = buildBench(rows, rane, { filter: "all", sort: "oldest", query: "", now });
 
   it("counts the stat cards like the mock", () => {
-    expect(bench.stats.needsYou.count).toBe(5); // six tickets, one parked
-    expect(bench.stats.waiting).toEqual({ count: 1, note: "James · dial requested Oct 2" });
-    expect(bench.stats.over14).toEqual({ count: 3, note: "Dana · Maria · James" });
-    expect(bench.stats.readyToShip).toEqual({ count: 1, note: "Leo Park · label not printed" });
+    expect(bench.stats.needsYou.count).toBe(7); // nine tickets, two parked
+    expect(bench.stats.parked).toEqual({ count: 2, note: "1 waiting on parts · 1 cannot replicate" });
+    expect(bench.stats.over14).toEqual({ count: 1, note: "Old" });
+    expect(bench.stats.awaitingPayment).toEqual({ count: 1, note: "Sarah · invoice sent Oct 11" });
   });
 
-  it("pins Needs attention first, then stage groups in order", () => {
-    expect(bench.groups.map((g) => `${g.key}:${g.count}`)).toEqual(["attention:3", "fix:1", "test:1", "ship:1"]);
-    expect(bench.groups[0].tickets.map((t) => t.number)).toEqual(["NW260001", "NW260002", "NW260003"]);
+  it("pins Parked first, then attention, then the steps in order", () => {
+    expect(bench.groups.map((g) => `${g.key}:${g.count}`)).toEqual(["parked:2", "attention:1", "check_in:1", "repair:1", "test:2", "payment:1", "ship:1"]);
+    expect(bench.groups[0].tickets.map((t) => t.number)).toEqual(["NW260003", "NW260009"]);
+  });
+
+  it("tags parked and payment rows", () => {
+    const by = Object.fromEntries(bench.groups.flatMap((g) => g.tickets).map((t) => [t.number, t.tag]));
+    expect(by.NW260003).toEqual({ text: "Waiting on parts · asked Oct 18", tone: "amber" });
+    expect(by.NW260009).toEqual({ text: "Cannot replicate · Slack 1 reply", tone: "coral" });
+    expect(by.NW260005).toEqual({ text: "$180 · invoice sent Oct 11", tone: "gold" });
+    expect(by.NW260006).toBeNull();
   });
 
   it("filter counts match the chips", () => {
-    expect(bench.counts).toEqual({ all: 6, needs_me: 5, waiting: 1, priority: 1, over_14: 3 });
+    expect(bench.counts).toEqual({ all: 9, needs_me: 7, parked: 2, priority: 1, payment: 1, over_14: 1 });
   });
 
   it("filters, searches and sorts", () => {
     const p = buildBench(rows, rane, { filter: "priority", sort: "oldest", query: "", now });
     expect(p.groups.flatMap((g) => g.tickets.map((t) => t.number))).toEqual(["NW260004"]);
-    const q = buildBench(rows, rane, { filter: "all", sort: "newest", query: "sector deep", now });
-    // Needs attention stays pinned first; newest-first applies inside each group.
-    expect(q.groups[0].tickets.map((t) => t.number)).toEqual(["NW260003", "NW260002", "NW260001"]);
     const s = buildBench(rows, rane, { filter: "all", sort: "oldest", query: "leo", now });
     expect(s.groups.map((g) => g.key)).toEqual(["ship"]);
   });
 
   it("a brand rep only 'needs' the check-in step", () => {
     const r = buildBench(rows, rep, { filter: "all", sort: "oldest", query: "", now });
-    expect(r.stats.needsYou.count).toBe(1);
+    expect(r.stats.needsYou.count).toBe(2);
+  });
+});
+
+describe("buildClosed", () => {
+  const closed: BenchRow[] = [
+    row({ number: "NW260007", stage: "closed", daysAgo: 47, customer_name: "Tom Reyes", closed_at: "2026-09-06T12:00:00Z", outcome: "Clasp replaced." }),
+    row({ number: "NW260008", stage: "closed", daysAgo: 44, customer_name: "Priya Nair", closed_at: "2026-09-09T12:00:00Z", needs_payment: true, payment_received: true, outcome: "Crystal replaced." }),
+    row({ number: "NW260019", stage: "closed", daysAgo: 41, customer_name: "Lena Park", closed_at: "2026-09-12T12:00:00Z", outcome: "nothing wrong" }),
+    row({ number: "NW260014", stage: "closed", daysAgo: 54, customer_name: "Marcus Hill", closed_at: "2026-08-30T12:00:00Z", outcome: "Demagnetised." }),
+  ];
+  it("groups by month, newest first, with the D13 filters", () => {
+    const c = buildClosed(closed, rane, { filter: "all", query: "", now });
+    expect(c.groups.map((g) => `${g.label}:${g.count}`)).toEqual(["September 2026:3", "August 2026:1"]);
+    expect(c.groups[0].tickets.map((t) => t.number)).toEqual(["NW260019", "NW260008", "NW260007"]);
+    expect(c.counts).toEqual({ all: 4, warranty: 3, paid: 1, nothing_wrong: 1 });
   });
 });

@@ -7,19 +7,22 @@ import type { Database } from "@/lib/supabase/database.types";
 
 export type Stage = Database["public"]["Enums"]["stage"];
 export type MemberRole = Database["public"]["Enums"]["member_role"];
-export type Component = Database["public"]["Enums"]["component"];
+/** The seven steps a ticket walks through; `closed` is the end state, not a step. */
+export type Step = Exclude<Stage, "closed">;
 
 export type Grant = { role: MemberRole; workspace_id: string | null; brand_id: string | null };
 
 /** Stage order, as the step rail shows it. */
-export const STAGES: Stage[] = ["check_in", "inspect", "supply", "fix", "test", "ship", "closed"];
+export const STAGES: Stage[] = ["check_in", "inspect", "supply", "repair", "test", "payment", "ship", "closed"];
+export const STEPS: Step[] = ["check_in", "inspect", "supply", "repair", "test", "payment", "ship"];
 
 export const STAGE_LABELS: Record<Stage, string> = {
   check_in: "Check in",
   inspect: "Inspect",
   supply: "Supply",
-  fix: "Fix",
+  repair: "Repair",
   test: "Test",
+  payment: "Payment",
   ship: "Ship",
   closed: "Closed",
 };
@@ -31,28 +34,26 @@ export const ROLE_LABELS: Record<MemberRole, string> = {
   watchmaker: "Watchmaker",
 };
 
-/** The twelve components, alphabetical so a chip is easy to find. */
-export const COMPONENTS: Component[] = [
-  "bezel", "case", "caseback", "clasp", "crown", "crystal", "dial", "gaskets", "hands", "lume", "movement", "strap",
-];
-
-export const COMPONENT_LABELS: Record<Component, string> = {
-  bezel: "Bezel",
-  crystal: "Crystal",
-  crown: "Crown",
-  case: "Case",
-  caseback: "Caseback",
-  dial: "Dial",
-  hands: "Hands",
-  movement: "Movement",
-  gaskets: "Gaskets",
-  strap: "Strap",
-  clasp: "Clasp",
-  lume: "Lume",
-};
+export const TEST_KINDS = ["time", "water", "looks"] as const;
+export type TestKind = (typeof TEST_KINDS)[number];
+export const TEST_LABELS: Record<TestKind, string> = { time: "Timekeeping", water: "Water resistance", looks: "Looks" };
 
 export function stageIndex(stage: Stage): number {
   return STAGES.indexOf(stage);
+}
+
+/** The step after this one; Payment is skipped on a warranty ticket. */
+export function nextStage(stage: Stage, needsPayment: boolean): Stage | null {
+  const next = STAGES[stageIndex(stage) + 1] ?? null;
+  return next === "payment" && !needsPayment ? "ship" : next;
+}
+
+/** The step before this one, for "Back to <previous>". */
+export function previousStep(stage: Stage, needsPayment: boolean): Step | null {
+  const ix = stageIndex(stage);
+  if (ix <= 0) return null;
+  const prev = STAGES[ix - 1] as Step;
+  return prev === "payment" && !needsPayment ? "test" : prev;
 }
 
 export function isOwner(grants: Grant[]): boolean {

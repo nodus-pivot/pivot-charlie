@@ -124,7 +124,7 @@ function Brands({ workspaceId, brands, isOwner }: { workspaceId: string; brands:
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <Eyebrow>Brands</Eyebrow>
-          <p className="text-[13px] text-ink-3">Each brand has its own models, parts, reps and watchmakers. Retiring a brand hides it from pickers; its tickets keep working.</p>
+          <p className="text-[13px] text-ink-3">Each brand has its own reps and watchmakers. Retiring a brand hides it from pickers; its tickets keep working.</p>
         </div>
         {isOwner && !adding ? <Button size="sm" variant="primary" onClick={() => setAdding(true)}><Plus size={12} /> New brand</Button> : null}
       </div>
@@ -148,7 +148,7 @@ function Brands({ workspaceId, brands, isOwner }: { workspaceId: string; brands:
             ) : (
               <span className="flex flex-1 items-baseline gap-3">
                 <span className="font-display text-[22px] font-semibold text-ink">{b.name}</span>
-                <span className="font-mono text-xs text-ink-3">{b.watches} model{b.watches === 1 ? "" : "s"}</span>
+                <span className="font-mono text-xs text-ink-3">{b.tickets} open ticket{b.tickets === 1 ? "" : "s"}</span>
                 {!b.is_active ? <Chip tone="neutral">retired</Chip> : null}
               </span>
             )}

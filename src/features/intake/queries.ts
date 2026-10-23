@@ -1,8 +1,7 @@
 import "server-only";
-import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { readTab } from "@/lib/google/sheets";
-import { INCOMING_TAB, parseIncoming, type CatalogWatch, type IncomingRow } from "./sheet";
+import { INCOMING_TAB, parseIncoming, type IncomingRow } from "./sheet";
 
 /**
  * Reads of the Incoming tab. The sheet is read whole and kept for a short
@@ -38,28 +37,20 @@ export type IncomingQueue = {
   stale: boolean;
   /** Ledger rows whose sheet move did not finish. Shown as a notice with Retry. */
   pendingMoves: { id: string; fingerprint: string; status: "imported" | "dismissed"; name: string }[];
-  catalog: CatalogWatch[];
   /** Status cells queued for the month tabs and not yet written. */
   pendingWritebacks: number;
   failedWritebacks: { ticket: string; column: string; error: string }[];
 };
 
-export const getCatalog = cache(async (brandId: string): Promise<CatalogWatch[]> => {
+export async function listIncoming(workspaceId: string, opts: { force?: boolean } = {}): Promise<IncomingQueue> {
   const supabase = await createClient();
-  const { data } = await supabase.from("watches").select("id, name, warranty_months").eq("brand_id", brandId).eq("is_active", true).order("name");
-  return data ?? [];
-});
-
-export async function listIncoming(workspaceId: string, brandId: string, opts: { force?: boolean } = {}): Promise<IncomingQueue> {
-  const supabase = await createClient();
-  const [{ values, syncedAt, stale }, catalog, { data: ledger }, { data: wb }] = await Promise.all([
+  const [{ values, syncedAt, stale }, { data: ledger }, { data: wb }] = await Promise.all([
     readIncomingValues(opts.force),
-    getCatalog(brandId),
     supabase.from("sheet_rows").select("id, fingerprint, status, moved_at, raw").eq("workspace_id", workspaceId),
     supabase.from("sheet_writebacks").select("status, column_name, last_error, ticket:tickets(number)").in("status", ["pending", "failed"]),
   ]);
   const acted = new Set((ledger ?? []).map((r) => r.fingerprint));
-  const rows = parseIncoming(values, catalog).filter((r) => !acted.has(r.fingerprint));
+  const rows = parseIncoming(values).filter((r) => !acted.has(r.fingerprint));
   const pendingMoves = (ledger ?? [])
     .filter((r) => r.moved_at === null)
     .map((r) => ({ id: r.id, fingerprint: r.fingerprint, status: r.status, name: ((r.raw as Record<string, string>)?.Name ?? "a row").toString() }));
@@ -67,13 +58,13 @@ export async function listIncoming(workspaceId: string, brandId: string, opts: {
   const failedWritebacks = (wb ?? [])
     .filter((w) => w.status === "failed")
     .map((w) => ({ ticket: (w.ticket as unknown as { number: string } | null)?.number ?? "?", column: w.column_name, error: w.last_error ?? "" }));
-  return { rows, syncedAt, stale, pendingMoves, catalog, pendingWritebacks, failedWritebacks };
+  return { rows, syncedAt, stale, pendingMoves, pendingWritebacks, failedWritebacks };
 }
 
 /** For the My bench tab count. Null when the sheet can't be reached, so the bench still renders. */
-export async function countIncoming(workspaceId: string, brandId: string): Promise<number | null> {
+export async function countIncoming(workspaceId: string): Promise<number | null> {
   try {
-    const q = await listIncoming(workspaceId, brandId);
+    const q = await listIncoming(workspaceId);
     return q.rows.length;
   } catch {
     return null;

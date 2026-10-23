@@ -1,17 +1,20 @@
 import Link from "next/link";
-import { Lightning, MagnifyingGlass, Package, Watch } from "@phosphor-icons/react/dist/ssr";
+import { Lightning, MagnifyingGlass, Watch } from "@phosphor-icons/react/dist/ssr";
 import { Chip, ChipLink } from "@/components/ui/chip";
 import { Img } from "@/components/ui/photo";
 import { buttonClasses } from "@/components/ui/button";
 import { STAGE_LABELS } from "@/features/pipeline";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { AGE_BAR_MAX_DAYS, BENCH_FILTERS, type Bench, type BenchFilter, type BenchSort, type BenchTicket } from "../bench";
+import { AGE_BAR_MAX_DAYS, BENCH_FILTERS, CLOSED_FILTERS, type Bench, type BenchFilter, type BenchGroup, type BenchSort, type BenchTicket, type ClosedFilter } from "../bench";
 
 type Props = {
   bench: Bench;
   view: "open" | "closed";
   filter: BenchFilter;
+  closedFilter: ClosedFilter;
+  closedGroups: BenchGroup[];
+  closedCounts: Record<ClosedFilter, number>;
   sort: BenchSort;
   query: string;
 };
@@ -23,17 +26,18 @@ function href(params: Record<string, string | undefined>): string {
   return s ? `/service-center?${s}` : "/service-center";
 }
 
-export function BenchView({ bench, view, filter, sort, query }: Props) {
+export function BenchView({ bench, view, filter, closedFilter, closedGroups, closedCounts, sort, query }: Props) {
   const { stats } = bench;
   const closed = view === "closed";
+  const groups = closed ? closedGroups : bench.groups;
   return (
     <section className="flex flex-col gap-[22px] px-4 pb-10 pt-7 sm:px-8 lg:px-12">
       {!closed ? (
         <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Needs you" value={stats.needsYou.count} note={stats.needsYou.note} />
-          <StatCard label="Waiting on parts" value={stats.waiting.count} note={stats.waiting.note} tone={stats.waiting.count ? "amber" : undefined} />
+          <StatCard label="Parked" value={stats.parked.count} note={stats.parked.note} tone={stats.parked.count ? "amber" : undefined} />
           <StatCard label="Over 14 days" value={stats.over14.count} note={stats.over14.note} tone={stats.over14.count ? "coral" : undefined} />
-          <StatCard label="Ready to ship" value={stats.readyToShip.count} note={stats.readyToShip.note} />
+          <StatCard label="Awaiting payment" value={stats.awaitingPayment.count} note={stats.awaitingPayment.note} />
         </div>
       ) : null}
 
@@ -44,7 +48,11 @@ export function BenchView({ bench, view, filter, sort, query }: Props) {
                 {f.label} {bench.counts[f.key]}
               </ChipLink>
             ))
-          : null}
+          : CLOSED_FILTERS.map((f) => (
+              <ChipLink key={f.key} href={href({ view: "closed", filter: f.key === "all" ? undefined : f.key, q: query })} active={closedFilter === f.key}>
+                {f.label} {closedCounts[f.key]}
+              </ChipLink>
+            ))}
         <form className="ml-auto flex items-center gap-2" action="/service-center" method="get">
           {closed ? <input type="hidden" name="view" value="closed" /> : null}
           {filter !== "all" ? <input type="hidden" name="filter" value={filter} /> : null}
@@ -72,15 +80,15 @@ export function BenchView({ bench, view, filter, sort, query }: Props) {
         </form>
       </div>
 
-      {bench.groups.length === 0 ? (
-        <p className="py-10 text-sm text-ink-3">{query || filter !== "all" ? "Nothing matches." : closed ? "No closed tickets yet." : "The bench is clear."}</p>
+      {groups.length === 0 ? (
+        <p className="py-10 text-sm text-ink-3">{query || filter !== "all" || closedFilter !== "all" ? "Nothing matches." : closed ? "No closed tickets yet." : "The bench is clear."}</p>
       ) : (
         <div className="flex flex-col">
-          {bench.groups.map((g) => (
+          {groups.map((g) => (
             <div key={g.key}>
               <div className="flex items-baseline gap-3 pb-2 pt-7">
                 <span className="text-[11px] uppercase tracking-label text-ink-3">{g.label}</span>
-                <span className={cn("font-mono text-xs", g.key === "attention" ? "text-coral" : "text-ink-3")}>{g.count}</span>
+                <span className={cn("font-mono text-xs", g.key === "attention" ? "text-coral" : g.key === "parked" ? "text-amber" : "text-ink-3")}>{g.count}</span>
                 {g.note ? <span className="text-xs text-coral">· {g.note}</span> : null}
               </div>
               {g.tickets.map((t) => (
@@ -117,20 +125,16 @@ function Row({ t, closed }: { t: BenchTicket; closed: boolean }) {
         <span className="flex items-center gap-2 font-display text-[22px] leading-tight font-semibold text-ink">
           {t.priority ? <Lightning size={14} weight="fill" className="shrink-0 text-coral" aria-label="Priority" /> : null}
           <Link href={to} className="sm:truncate hover:text-gold-light">{t.customer_name}</Link>
-          {t.parked ? (
-            <Chip tone="amber" className="hidden sm:inline-flex">
-              <Package size={12} /> Waiting on {t.waiting_on?.split(",")[0].toLowerCase() ?? "part"}
-            </Chip>
-          ) : null}
           {t.return_to_everett ? <Chip tone="neutral" className="hidden sm:inline-flex">To Everett</Chip> : null}
         </span>
+        {t.tag && !closed ? <span className={cn("text-[12.5px]", t.tag.tone === "amber" ? "text-amber" : t.tag.tone === "coral" ? "text-coral" : "text-gold-light")}>{t.tag.text}</span> : null}
         <span className="text-[12.5px] text-ink-3">
-          {t.watch_name} · <span className="font-mono">{t.number}</span>
-          {t.progress ? ` · ${t.progress}` : ""}
-          {closed && t.closed_at ? ` · closed ${formatDate(t.closed_at)}` : ""}
+          {t.watch} · <span className="font-mono">{t.number}</span>
+          {closed && t.outcome ? ` · ${t.outcome}` : ""}
+          {closed && t.closed_at ? ` · ${formatDate(t.closed_at)}` : ""}
         </span>
       </div>
-      <span className="hidden text-xs uppercase tracking-label text-ink-2 lg:block">{closed ? "Closed" : STAGE_LABELS[t.stage]}</span>
+      <span className="hidden text-xs uppercase tracking-label text-ink-2 lg:block">{closed ? "Closed" : `${STAGE_LABELS[t.stage]}${t.progress ? ` · ${t.progress}` : ""}`}</span>
       {closed ? (
         <span className="hidden lg:block" />
       ) : (
@@ -143,7 +147,7 @@ function Row({ t, closed }: { t: BenchTicket; closed: boolean }) {
       )}
       <span className="col-start-3 row-start-1 justify-self-end lg:col-start-auto lg:row-start-auto">
         <Link href={to} className={buttonClasses(t.next.emphasis ? "primary" : "secondary", "sm")}>
-          {closed ? "Open" : t.next.label}
+          {closed ? "Summary" : t.next.label}
         </Link>
       </span>
     </div>

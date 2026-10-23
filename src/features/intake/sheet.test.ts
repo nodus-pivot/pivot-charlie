@@ -4,7 +4,6 @@ import {
   findRowByFingerprint,
   fingerprint,
   firstEmptyRow,
-  matchModel,
   monthTabOrder,
   parseIncoming,
   parseIssue,
@@ -14,15 +13,6 @@ import {
 
 const HEADER = ["Date", "Name", "Model", "Serial Number", "Issue", "Address Line 1", "Address Line 2", "City", "State", "Zip Code", "Country", "Email", "Payment Required?", "Return to Everett?"];
 const MONTH_HEADER = ["Date Received", "Name", "Model", "Serial Number", "Issue", "Address Line 1", "Address Line 2", "City", "State", "Zip", "Country", "Email", "Solution", "Notes", "Payment Required?", "Payment Received?", "Repair Completed?", "Shipped Back?", "Return to Everett"];
-
-const catalog = [
-  { id: "sd", name: "Sector Deep", warranty_months: 24 },
-  { id: "sgmt", name: "Sector GMT", warranty_months: 24 },
-  { id: "av2", name: "Avalon II", warranty_months: 24 },
-  { id: "ct", name: "Contrail GMT", warranty_months: 24 },
-  { id: "cyn", name: "Canyon", warranty_months: 24 },
-  { id: "tt", name: "TrailTrekker", warranty_months: 24 },
-];
 
 describe("parsing", () => {
   it("reads both date styles", () => {
@@ -60,17 +50,6 @@ describe("fingerprint", () => {
   });
 });
 
-describe("matchModel", () => {
-  it("exact, fuzzy, none", () => {
-    expect(matchModel("Sector Deep", catalog)).toMatchObject({ kind: "exact", watch: { id: "sd" } });
-    expect(matchModel("Sector Deep AWWC", catalog)).toMatchObject({ kind: "fuzzy", watch: { id: "sd" } });
-    expect(matchModel("Contrail GMT Bracelet", catalog)).toMatchObject({ kind: "fuzzy", watch: { id: "ct" } });
-    expect(matchModel("Sector Series", catalog)).toEqual({ kind: "none" });
-    expect(matchModel("NodeX", catalog)).toEqual({ kind: "none" });
-    expect(matchModel("", catalog)).toEqual({ kind: "none" });
-  });
-});
-
 describe("parseIncoming", () => {
   const values = [
     HEADER,
@@ -79,14 +58,15 @@ describe("parseIncoming", () => {
     ["", "", "", "", "", "", "", "", "", "", "", "", "FALSE"],
     ["7/13/2026", "David Mondero", "Sector Series", "5100030", "Stops and starts - RETURN TO EVERETT", "5495 Burr Oak Rd", "APT 210", "Lisle", "IL", "60532", "US", "d@pm.me", "FALSE", "TRUE"],
   ];
-  const rows = parseIncoming(values, catalog);
+  const rows = parseIncoming(values);
   it("skips filler rows and keeps sheet row numbers", () => {
     expect(rows.map((r) => r.row)).toEqual([2, 3, 5]);
   });
   it("derives badges and flags", () => {
-    expect(rows[0]).toMatchObject({ hasEmail: true, hasAddress: true, needsPayment: false, model: { kind: "exact" } });
-    expect(rows[1]).toMatchObject({ hasEmail: true, hasAddress: false, needsPayment: true, model: { kind: "none" } });
-    expect(rows[2]).toMatchObject({ returnToEverett: true, model: { kind: "none" } });
+    expect(rows[0]).toMatchObject({ hasEmail: true, hasAddress: true, needsPayment: false });
+    expect(rows[0].fields.model).toBe("TrailTrekker");
+    expect(rows[1]).toMatchObject({ hasEmail: true, hasAddress: false, needsPayment: true });
+    expect(rows[2]).toMatchObject({ returnToEverett: true });
   });
   it("finds a row again by fingerprint", () => {
     expect(findRowByFingerprint(values, rows[1].fingerprint)).toBe(3);

@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Workspace" };
 export default async function WorkspacePage() {
   const [user, ws] = await Promise.all([getCurrentUser(), getWorkspaceContext()]);
   if (!user) redirect(SIGN_IN_PATH);
-  if (!ws.current || !canOpenOpsPage(user.grants, "workspace", ws.current.id)) redirect("/ops/watches");
+  if (!ws.current || !canOpenOpsPage(user.grants, "workspace", ws.current.id)) redirect("/service-center");
   const brands = await listWorkspaceBrands(ws.current.id);
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
   return (

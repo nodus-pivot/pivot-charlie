@@ -1,10 +1,10 @@
-import type { Stage } from "@/features/pipeline";
+import { STAGES, type Stage } from "@/features/pipeline";
 import { formatDate } from "@/lib/format";
 import { countryName, isCountryCode, usStateName } from "@/lib/country";
 
 /**
  * The customer's view of the pipeline. Pure: maps the status payload from
- * customer_ticket_status() to the seven public steps with their dates.
+ * customer_ticket_status() to the public steps with their dates.
  */
 
 export type PublicStatus = {
@@ -17,9 +17,9 @@ export type PublicStatus = {
   received_at: string | null;
   shipped_at: string | null;
   closed_at: string | null;
+  needs_payment: boolean;
   carrier: string | null;
   tracking: string | null;
-  handed_over: boolean;
   return_to_everett: boolean;
   /** City, state and country only; the street and postal code never reach the browser. */
   ship_to: { city?: string | null; state?: string | null; country?: string | null } | null;
@@ -31,22 +31,23 @@ export type PublicStep = { key: Stage; label: string; date: string | null; state
 const LABELS: Record<Stage, string> = {
   check_in: "Request received",
   inspect: "Watch received, diagnosis underway",
-  supply: "Getting a part ready for your repair",
-  fix: "Repair in progress",
+  supply: "Getting parts ready for your repair",
+  repair: "Repair in progress",
   test: "Testing the repair",
+  payment: "Awaiting payment",
   ship: "On its way back to you",
   closed: "Complete",
 };
-
-const ORDER: Stage[] = ["check_in", "inspect", "supply", "fix", "test", "ship", "closed"];
 
 export function publicLabel(stage: Stage): string {
   return LABELS[stage];
 }
 
+/** The steps a customer sees: Payment only appears on a paid repair. */
 export function publicSteps(s: PublicStatus, now: Date = new Date()): PublicStep[] {
-  const current = ORDER.indexOf(s.stage);
-  return ORDER.map((key, i) => {
+  const order = STAGES.filter((k) => k !== "payment" || s.needs_payment);
+  const current = order.indexOf(s.stage);
+  return order.map((key, i) => {
     const at =
       key === "check_in" ? s.submitted_at
       : key === "inspect" ? (s.received_at ?? s.entered.inspect ?? null)
@@ -54,7 +55,7 @@ export function publicSteps(s: PublicStatus, now: Date = new Date()): PublicStep
       : key === "closed" ? (s.closed_at ?? null)
       : (s.entered[key] ?? null);
     const state = i < current ? "done" : i === current ? "current" : "future";
-    return { key, label: key === "ship" && s.handed_over ? "Handed to you in person" : LABELS[key], date: state === "future" ? null : at ? formatDate(at, now) : null, state };
+    return { key, label: LABELS[key], date: state === "future" ? null : at ? formatDate(at, now) : null, state };
   });
 }
 
@@ -66,15 +67,17 @@ export function rightNowNote(s: PublicStatus): string {
     case "inspect":
       return "The watchmaker is looking it over.";
     case "supply":
-      return "A part is on its way to the bench. We'll update the estimate as it arrives.";
-    case "fix":
+      return "Parts are on their way to the bench. We'll update the estimate as they arrive.";
+    case "repair":
       return "On the bench now.";
     case "test":
       return "Timing, water resistance and a final look before it ships.";
+    case "payment":
+      return "The repair is done. It ships as soon as the invoice is settled.";
     case "ship":
       return s.return_to_everett ? "Heading back to Nodus fulfillment first." : "Packed and on its way.";
     case "closed":
-      return s.tracking ? `Shipped ${s.carrier?.toUpperCase() ?? ""} ${s.tracking}`.trim() : "Thanks for sending it in.";
+      return s.tracking ? `Shipped ${s.carrier ?? ""} ${s.tracking}`.trim() : "Thanks for sending it in.";
   }
 }
 

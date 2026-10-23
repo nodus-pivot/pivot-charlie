@@ -3,7 +3,7 @@ import { normalizeCountry } from "@/lib/country";
 
 /**
  * Pure logic for the Google Sheet: header mapping, row parsing, fingerprints,
- * model matching, and building the row that lands on the month tab. No
+ * and building the row that lands on the month tab. No
  * network, no React. Tested in sheet.test.ts.
  */
 
@@ -120,25 +120,6 @@ export function isTrue(s: string): boolean {
   return /^(true|yes|y|1)$/i.test(s.trim());
 }
 
-export type CatalogWatch = { id: string; name: string; warranty_months: number | null };
-
-export type ModelMatch = { kind: "exact" | "fuzzy"; watch: CatalogWatch } | { kind: "none" };
-
-/** Exact (normalised) name, else the longest catalog name contained in the model text, else none. */
-export function matchModel(model: string, catalog: CatalogWatch[]): ModelMatch {
-  const m = norm(model);
-  if (!m) return { kind: "none" };
-  const exact = catalog.find((w) => norm(w.name) === m);
-  if (exact) return { kind: "exact", watch: exact };
-  const contained = catalog
-    .filter((w) => {
-      const n = norm(w.name);
-      return n.length >= 4 && (` ${m} `.includes(` ${n} `) || m.startsWith(n + " ") || m.endsWith(" " + n));
-    })
-    .sort((a, b) => b.name.length - a.name.length);
-  return contained[0] ? { kind: "fuzzy", watch: contained[0] } : { kind: "none" };
-}
-
 export type IncomingRow = {
   fingerprint: string;
   /** 1-based row number in the sheet at read time. Positions shift; re-read before acting. */
@@ -159,10 +140,9 @@ export type IncomingRow = {
   needsPayment: boolean;
   paymentAmount: number | null;
   returnToEverett: boolean;
-  model: ModelMatch;
 };
 
-export function parseIncoming(values: string[][], catalog: CatalogWatch[]): IncomingRow[] {
+export function parseIncoming(values: string[][]): IncomingRow[] {
   const [header, ...rows] = values;
   if (!header) return [];
   const out: IncomingRow[] = [];
@@ -191,7 +171,6 @@ export function parseIncoming(values: string[][], catalog: CatalogWatch[]): Inco
       needsPayment: isTrue(f.paymentRequired) || paymentAmount !== null,
       paymentAmount,
       returnToEverett: isTrue(f.returnToEverett),
-      model: matchModel(f.model, catalog),
     });
   });
   return out;

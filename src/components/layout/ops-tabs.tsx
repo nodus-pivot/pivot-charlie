@@ -4,15 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export type OpsView = "watches" | "components" | "users" | "workspace";
+export type OpsView = "users" | "workspace";
 
 /** Same fixed strip as Service Center: under the nav, on every Ops view. Reads the URL in the browser so client navigations update it. */
 export function OpsTabs({ show }: { show: OpsView[] }) {
   const pathname = usePathname();
   const active = (show.find((p) => pathname.startsWith(`/ops/${p}`)) ?? show[0]) as OpsView;
   const tabs: { key: OpsView; href: string; label: string }[] = [
-    { key: "watches", href: "/ops/watches", label: "Watches" },
-    { key: "components", href: "/ops/components", label: "Components" },
     { key: "users", href: "/ops/users", label: "Users" },
     { key: "workspace", href: "/ops/workspace", label: "Workspace" },
   ];

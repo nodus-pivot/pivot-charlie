@@ -41,17 +41,17 @@ export const getVisibleBrands = cache(async (): Promise<BrandOption[]> => {
   return data ?? [];
 });
 
-export type BrandSummary = { id: string; name: string; slug: string; is_active: boolean; watches: number };
+export type BrandSummary = { id: string; name: string; slug: string; is_active: boolean; slack_channel_id: string | null; tickets: number };
 
-/** The brands under a workspace with how many models each carries. Admin-only page. */
+/** The brands under a workspace with how many open tickets each carries. Admin-only page. */
 export async function listWorkspaceBrands(workspaceId: string): Promise<BrandSummary[]> {
   const supabase = await createClient();
-  const [{ data: brands, error }, { data: watches }] = await Promise.all([
-    supabase.from("brands").select("id, name, slug, is_active").eq("workspace_id", workspaceId).order("name"),
-    supabase.from("watches").select("brand_id").eq("workspace_id", workspaceId).eq("is_active", true),
+  const [{ data: brands, error }, { data: tickets }] = await Promise.all([
+    supabase.from("brands").select("id, name, slug, is_active, slack_channel_id").eq("workspace_id", workspaceId).order("name"),
+    supabase.from("tickets").select("brand_id").eq("workspace_id", workspaceId).neq("stage", "closed"),
   ]);
   if (error) throw error;
   const by = new Map<string, number>();
-  for (const w of watches ?? []) by.set(w.brand_id, (by.get(w.brand_id) ?? 0) + 1);
-  return (brands ?? []).map((b) => ({ ...b, watches: by.get(b.id) ?? 0 }));
+  for (const t of tickets ?? []) by.set(t.brand_id, (by.get(t.brand_id) ?? 0) + 1);
+  return (brands ?? []).map((b) => ({ ...b, tickets: by.get(b.id) ?? 0 }));
 }

@@ -46,12 +46,11 @@ export async function createTicket(raw: unknown): Promise<IntakeResult> {
     p: {
       workspace_id: ctx.workspace.id,
       brand_id: input.brandId,
-      watch_id: input.watchId,
+      watch: input.watch,
       customer_name: input.customerName,
       customer_email: input.customerEmail,
       customer_phone: input.customerPhone,
       ship_to: hasAddress ? input.shipTo : null,
-      customer_model_text: input.modelText,
       serial: input.serial,
       issue: input.issue,
       bench_note: input.benchNote,
@@ -121,8 +120,7 @@ export async function dismissRow(raw: unknown): Promise<{ ok: true; moveError?: 
 export async function retryMoves(): Promise<{ ok: true; finished: number; failed: string[] } | { ok: false; error: string }> {
   const ctx = await intakeContext();
   if (!ctx.ok) return ctx;
-  const brandId = ctx.brands.find((b) => b.workspace_id === ctx.workspace.id)?.id ?? "";
-  const q = await listIncoming(ctx.workspace.id, brandId, { force: true });
+  const q = await listIncoming(ctx.workspace.id, { force: true });
   let finished = 0;
   const failed: string[] = [];
   for (const p of q.pendingMoves) {

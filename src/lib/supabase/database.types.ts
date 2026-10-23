@@ -20,6 +20,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          slack_channel_id: string | null
           slug: string
           updated_at: string
           workspace_id: string
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          slack_channel_id?: string | null
           slug: string
           updated_at?: string
           workspace_id: string
@@ -38,6 +40,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          slack_channel_id?: string | null
           slug?: string
           updated_at?: string
           workspace_id?: string
@@ -104,63 +107,6 @@ export type Database = {
           },
           {
             foreignKeyName: "memberships_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      parts: {
-        Row: {
-          brand_id: string
-          component: Database["public"]["Enums"]["component"]
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          photo_path: string | null
-          sku: string
-          updated_at: string
-          variant: string | null
-          workspace_id: string
-        }
-        Insert: {
-          brand_id: string
-          component: Database["public"]["Enums"]["component"]
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          photo_path?: string | null
-          sku: string
-          updated_at?: string
-          variant?: string | null
-          workspace_id: string
-        }
-        Update: {
-          brand_id?: string
-          component?: Database["public"]["Enums"]["component"]
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          photo_path?: string | null
-          sku?: string
-          updated_at?: string
-          variant?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "parts_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "parts_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -303,73 +249,6 @@ export type Database = {
           },
         ]
       }
-      shipments: {
-        Row: {
-          carrier: string | null
-          created_at: string
-          created_by: string | null
-          email_customer: boolean
-          handed_over: boolean
-          id: string
-          ship_to: Json | null
-          shipped_at: string | null
-          signature_required: boolean
-          ticket_id: string
-          tracking: string | null
-          updated_at: string
-        }
-        Insert: {
-          carrier?: string | null
-          created_at?: string
-          created_by?: string | null
-          email_customer?: boolean
-          handed_over?: boolean
-          id?: string
-          ship_to?: Json | null
-          shipped_at?: string | null
-          signature_required?: boolean
-          ticket_id: string
-          tracking?: string | null
-          updated_at?: string
-        }
-        Update: {
-          carrier?: string | null
-          created_at?: string
-          created_by?: string | null
-          email_customer?: boolean
-          handed_over?: boolean
-          id?: string
-          ship_to?: Json | null
-          shipped_at?: string | null
-          signature_required?: boolean
-          ticket_id?: string
-          tracking?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shipments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shipments_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: true
-            referencedRelation: "ticket_board"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shipments_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: true
-            referencedRelation: "tickets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ticket_events: {
         Row: {
           actor_id: string | null
@@ -428,167 +307,75 @@ export type Database = {
           },
         ]
       }
-      ticket_findings: {
+      ticket_messages: {
         Row: {
-          action: Database["public"]["Enums"]["finding_action"]
-          component: Database["public"]["Enums"]["component"]
-          condition: Database["public"]["Enums"]["finding_condition"] | null
+          body: string
+          channel: Database["public"]["Enums"]["message_channel"]
           created_at: string
           created_by: string | null
-          done_at: string | null
-          done_by: string | null
-          found_at_stage: Database["public"]["Enums"]["stage"]
+          error: string | null
+          external_id: string | null
           id: string
-          note: string | null
-          part_id: string | null
+          kind: Database["public"]["Enums"]["message_kind"]
+          last_reply: string | null
+          recipient: string | null
+          replies_checked_at: string | null
+          reply_count: number
+          status: Database["public"]["Enums"]["message_status"]
+          subject: string | null
           ticket_id: string
-          updated_at: string
         }
         Insert: {
-          action?: Database["public"]["Enums"]["finding_action"]
-          component: Database["public"]["Enums"]["component"]
-          condition?: Database["public"]["Enums"]["finding_condition"] | null
+          body: string
+          channel: Database["public"]["Enums"]["message_channel"]
           created_at?: string
           created_by?: string | null
-          done_at?: string | null
-          done_by?: string | null
-          found_at_stage?: Database["public"]["Enums"]["stage"]
+          error?: string | null
+          external_id?: string | null
           id?: string
-          note?: string | null
-          part_id?: string | null
+          kind: Database["public"]["Enums"]["message_kind"]
+          last_reply?: string | null
+          recipient?: string | null
+          replies_checked_at?: string | null
+          reply_count?: number
+          status?: Database["public"]["Enums"]["message_status"]
+          subject?: string | null
           ticket_id: string
-          updated_at?: string
         }
         Update: {
-          action?: Database["public"]["Enums"]["finding_action"]
-          component?: Database["public"]["Enums"]["component"]
-          condition?: Database["public"]["Enums"]["finding_condition"] | null
+          body?: string
+          channel?: Database["public"]["Enums"]["message_channel"]
           created_at?: string
           created_by?: string | null
-          done_at?: string | null
-          done_by?: string | null
-          found_at_stage?: Database["public"]["Enums"]["stage"]
+          error?: string | null
+          external_id?: string | null
           id?: string
-          note?: string | null
-          part_id?: string | null
+          kind?: Database["public"]["Enums"]["message_kind"]
+          last_reply?: string | null
+          recipient?: string | null
+          replies_checked_at?: string | null
+          reply_count?: number
+          status?: Database["public"]["Enums"]["message_status"]
+          subject?: string | null
           ticket_id?: string
-          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "ticket_findings_created_by_fkey"
+            foreignKeyName: "ticket_messages_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ticket_findings_done_by_fkey"
-            columns: ["done_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_findings_part_id_fkey"
-            columns: ["part_id"]
-            isOneToOne: false
-            referencedRelation: "parts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_findings_ticket_id_fkey"
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "ticket_board"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ticket_findings_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "tickets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ticket_parts: {
-        Row: {
-          arrived_at: string | null
-          created_at: string
-          created_by: string | null
-          finding_id: string | null
-          have_it: boolean
-          id: string
-          label: string | null
-          note: string | null
-          part_id: string
-          qty: number
-          requested_at: string | null
-          ticket_id: string
-          updated_at: string
-        }
-        Insert: {
-          arrived_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          finding_id?: string | null
-          have_it?: boolean
-          id?: string
-          label?: string | null
-          note?: string | null
-          part_id: string
-          qty?: number
-          requested_at?: string | null
-          ticket_id: string
-          updated_at?: string
-        }
-        Update: {
-          arrived_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          finding_id?: string | null
-          have_it?: boolean
-          id?: string
-          label?: string | null
-          note?: string | null
-          part_id?: string
-          qty?: number
-          requested_at?: string | null
-          ticket_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ticket_parts_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_parts_finding_id_fkey"
-            columns: ["finding_id"]
-            isOneToOne: false
-            referencedRelation: "ticket_findings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_parts_part_id_fkey"
-            columns: ["part_id"]
-            isOneToOne: false
-            referencedRelation: "parts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_parts_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "ticket_board"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_parts_ticket_id_fkey"
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "tickets"
@@ -644,6 +431,61 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_steps: {
+        Row: {
+          answer: boolean | null
+          done_at: string | null
+          done_by: string | null
+          notes: string | null
+          skipped: boolean
+          stage: Database["public"]["Enums"]["stage"]
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          answer?: boolean | null
+          done_at?: string | null
+          done_by?: string | null
+          notes?: string | null
+          skipped?: boolean
+          stage: Database["public"]["Enums"]["stage"]
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: boolean | null
+          done_at?: string | null
+          done_by?: string | null
+          notes?: string | null
+          skipped?: boolean
+          stage?: Database["public"]["Enums"]["stage"]
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_steps_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_steps_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_steps_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -705,7 +547,6 @@ export type Database = {
       }
       tickets: {
         Row: {
-          bench_minutes: number | null
           bench_note: string | null
           brand_id: string
           claim_ref: string | null
@@ -714,35 +555,31 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_email: string | null
-          customer_model_text: string | null
           customer_name: string
           customer_phone: string | null
-          fix_note: string | null
           id: string
-          inspect_note: string | null
+          invoice_sent_at: string | null
           issue: string | null
+          label_url: string | null
           needs_payment: boolean
           number: string
           payment_amount: number | null
-          payment_received: boolean
           priority: boolean
-          received_at: string | null
           return_to_everett: boolean
           search: unknown
           serial: string | null
           sheet_row_id: string | null
+          ship_carrier: string | null
           ship_to: Json | null
+          ship_tracking: string | null
           source: Database["public"]["Enums"]["ticket_source"]
           stage: Database["public"]["Enums"]["stage"]
-          supply_note: string | null
           test_attempt: number
-          test_note: string | null
           updated_at: string
-          watch_id: string
+          watch: string
           workspace_id: string
         }
         Insert: {
-          bench_minutes?: number | null
           bench_note?: string | null
           brand_id: string
           claim_ref?: string | null
@@ -751,35 +588,31 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string | null
-          customer_model_text?: string | null
           customer_name: string
           customer_phone?: string | null
-          fix_note?: string | null
           id?: string
-          inspect_note?: string | null
+          invoice_sent_at?: string | null
           issue?: string | null
+          label_url?: string | null
           needs_payment?: boolean
           number: string
           payment_amount?: number | null
-          payment_received?: boolean
           priority?: boolean
-          received_at?: string | null
           return_to_everett?: boolean
           search?: unknown
           serial?: string | null
           sheet_row_id?: string | null
+          ship_carrier?: string | null
           ship_to?: Json | null
+          ship_tracking?: string | null
           source?: Database["public"]["Enums"]["ticket_source"]
           stage?: Database["public"]["Enums"]["stage"]
-          supply_note?: string | null
           test_attempt?: number
-          test_note?: string | null
           updated_at?: string
-          watch_id: string
+          watch: string
           workspace_id: string
         }
         Update: {
-          bench_minutes?: number | null
           bench_note?: string | null
           brand_id?: string
           claim_ref?: string | null
@@ -788,31 +621,28 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string | null
-          customer_model_text?: string | null
           customer_name?: string
           customer_phone?: string | null
-          fix_note?: string | null
           id?: string
-          inspect_note?: string | null
+          invoice_sent_at?: string | null
           issue?: string | null
+          label_url?: string | null
           needs_payment?: boolean
           number?: string
           payment_amount?: number | null
-          payment_received?: boolean
           priority?: boolean
-          received_at?: string | null
           return_to_everett?: boolean
           search?: unknown
           serial?: string | null
           sheet_row_id?: string | null
+          ship_carrier?: string | null
           ship_to?: Json | null
+          ship_tracking?: string | null
           source?: Database["public"]["Enums"]["ticket_source"]
           stage?: Database["public"]["Enums"]["stage"]
-          supply_note?: string | null
           test_attempt?: number
-          test_note?: string | null
           updated_at?: string
-          watch_id?: string
+          watch?: string
           workspace_id?: string
         }
         Relationships: [
@@ -838,107 +668,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tickets_watch_id_fkey"
-            columns: ["watch_id"]
-            isOneToOne: false
-            referencedRelation: "watches"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "tickets_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      watch_parts: {
-        Row: {
-          part_id: string
-          watch_id: string
-        }
-        Insert: {
-          part_id: string
-          watch_id: string
-        }
-        Update: {
-          part_id?: string
-          watch_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "watch_parts_part_id_fkey"
-            columns: ["part_id"]
-            isOneToOne: false
-            referencedRelation: "parts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "watch_parts_watch_id_fkey"
-            columns: ["watch_id"]
-            isOneToOne: false
-            referencedRelation: "watches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      watches: {
-        Row: {
-          brand_id: string
-          case_spec: string | null
-          created_at: string
-          id: string
-          is_active: boolean
-          movement: string | null
-          name: string
-          notes: string | null
-          photo_path: string | null
-          reference: string | null
-          updated_at: string
-          warranty_months: number | null
-          workspace_id: string
-        }
-        Insert: {
-          brand_id: string
-          case_spec?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          movement?: string | null
-          name: string
-          notes?: string | null
-          photo_path?: string | null
-          reference?: string | null
-          updated_at?: string
-          warranty_months?: number | null
-          workspace_id: string
-        }
-        Update: {
-          brand_id?: string
-          case_spec?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          movement?: string | null
-          name?: string
-          notes?: string | null
-          photo_path?: string | null
-          reference?: string | null
-          updated_at?: string
-          warranty_months?: number | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "watches_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "watches_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -983,33 +713,36 @@ export type Database = {
     Views: {
       ticket_board: {
         Row: {
+          awaiting_payment: boolean | null
           bench_photo_path: string | null
           brand_id: string | null
           closed_at: string | null
           coverage: Database["public"]["Enums"]["coverage"] | null
           created_at: string | null
           customer_name: string | null
-          findings_done: number | null
-          findings_total: number | null
           id: string | null
+          invoice_sent_at: string | null
           needs_payment: boolean | null
           number: string | null
+          outcome: string | null
           parked: boolean | null
-          parts_in_hand: number | null
+          parts_list: string | null
           parts_requested_at: string | null
-          parts_total: number | null
+          payment_amount: number | null
           payment_received: boolean | null
           priority: boolean | null
           received_at: string | null
           return_to_everett: boolean | null
           ship_ready: boolean | null
+          slack_kind: Database["public"]["Enums"]["message_kind"] | null
+          slack_replies: number | null
           source: Database["public"]["Enums"]["ticket_source"] | null
           stage: Database["public"]["Enums"]["stage"] | null
           stage_entered_at: string | null
+          test_attempt: number | null
           tests_passed: number | null
-          waiting_on: string | null
-          watch_id: string | null
-          watch_name: string | null
+          waiting_for_parts: boolean | null
+          watch: string | null
           workspace_id: string | null
         }
         Relationships: [
@@ -1018,13 +751,6 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tickets_watch_id_fkey"
-            columns: ["watch_id"]
-            isOneToOne: false
-            referencedRelation: "watches"
             referencedColumns: ["id"]
           },
           {
@@ -1041,6 +767,10 @@ export type Database = {
       admin_update_profile: {
         Args: { p_display_name: string; p_is_active: boolean; p_user: string }
         Returns: undefined
+      }
+      advance: {
+        Args: { p_override?: boolean; p_ticket: string }
+        Returns: Database["public"]["Enums"]["stage"]
       }
       create_ticket: {
         Args: { p: Json }
@@ -1065,42 +795,31 @@ export type Database = {
           workspace_id: string
         }[]
       }
-      set_stage: {
-        Args: {
-          p_kind?: string
-          p_override?: boolean
-          p_ticket: string
-          p_to: Database["public"]["Enums"]["stage"]
-        }
+      reopen: { Args: { p_ticket: string }; Returns: undefined }
+      send_back: {
+        Args: { p_ticket: string; p_to: Database["public"]["Enums"]["stage"] }
         Returns: undefined
+      }
+      skip_to_ship: {
+        Args: { p_ticket: string }
+        Returns: Database["public"]["Enums"]["stage"]
       }
     }
     Enums: {
-      component:
-        | "bezel"
-        | "crystal"
-        | "crown"
-        | "case"
-        | "dial"
-        | "hands"
-        | "movement"
-        | "gaskets"
-        | "strap"
-        | "clasp"
-        | "caseback"
-        | "lume"
       coverage: "warranty" | "paid"
-      finding_action: "fix" | "replace"
-      finding_condition: "worn" | "scratched" | "discolored" | "cracked"
       member_role: "owner" | "admin" | "brand_rep" | "watchmaker"
+      message_channel: "slack" | "email"
+      message_kind: "parts_needed" | "cannot_replicate" | "received" | "shipped"
+      message_status: "logged" | "sent" | "failed"
       photo_kind: "customer" | "bench"
       sheet_row_status: "imported" | "dismissed"
       stage:
         | "check_in"
         | "inspect"
         | "supply"
-        | "fix"
+        | "repair"
         | "test"
+        | "payment"
         | "ship"
         | "closed"
       test_kind: "time" | "water" | "looks"
@@ -1234,27 +953,23 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      component: [
-        "bezel",
-        "crystal",
-        "crown",
-        "case",
-        "dial",
-        "hands",
-        "movement",
-        "gaskets",
-        "strap",
-        "clasp",
-        "caseback",
-        "lume",
-      ],
       coverage: ["warranty", "paid"],
-      finding_action: ["fix", "replace"],
-      finding_condition: ["worn", "scratched", "discolored", "cracked"],
       member_role: ["owner", "admin", "brand_rep", "watchmaker"],
+      message_channel: ["slack", "email"],
+      message_kind: ["parts_needed", "cannot_replicate", "received", "shipped"],
+      message_status: ["logged", "sent", "failed"],
       photo_kind: ["customer", "bench"],
       sheet_row_status: ["imported", "dismissed"],
-      stage: ["check_in", "inspect", "supply", "fix", "test", "ship", "closed"],
+      stage: [
+        "check_in",
+        "inspect",
+        "supply",
+        "repair",
+        "test",
+        "payment",
+        "ship",
+        "closed",
+      ],
       test_kind: ["time", "water", "looks"],
       test_result: ["pass", "fail"],
       ticket_source: ["sheet", "by_hand"],

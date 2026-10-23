@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Generates supabase/seed.sql. Edit this file, never the .sql.
 
-Demo data for Pivot Charlie: the Nodus workspace, every model the warranty
-sheet mentions with a parts catalog covering all ten components, one demo
-sign-in per role, and the tickets the mocks show (one per stage plus closed
-ones). Deterministic ids (a0000000-0000-4000-8000-0000000NNNNN) so the file
-can be re-run: demo tickets are reset, tickets created in the app are kept.
+Demo data for Pivot Charlie (schema v2, seven steps): the Nodus workspace,
+one demo sign-in per role, and the bench the design handoff shows: ten open
+tickets across every step plus seven closed ones. Deterministic ids
+(a0000000-0000-4000-8000-0000000NNNNN) so the file can be re-run: demo
+tickets are reset, tickets created in the app are kept.
 
     python3 supabase/seed.py > supabase/seed.sql
     supabase db query --linked --file supabase/seed.sql
+
+`supabase db reset --linked` runs it automatically after the migrations.
+Dates are relative to now() so the bench stays fresh.
 """
 from __future__ import annotations
 
@@ -31,7 +34,9 @@ def q(v) -> str:
     return "'" + str(v).replace("'", "''") + "'"
 
 
-def days(n: float) -> str:
+def days(n: float | None) -> str:
+    if n is None:
+        return "null"
     return f"now() - interval '{n} days'"
 
 
@@ -63,103 +68,6 @@ emit()
 emit("insert into brands (id, workspace_id, name, slug) values")
 emit(f"  ({q(NODUS)}, {q(WS)}, 'Nodus', 'nodus')")
 emit("on conflict (id) do nothing;")
-emit()
-
-# ------------------------------------------------------------------ catalog
-# (id, name, reference, movement, case, notes)
-WATCHES = [
-    (101, "Sector Deep", "NW-SD-01", "NH35", "40mm · steel", None),
-    (102, "Avalon II", "NW-AV2-01", "NH35", "38mm · steel", None),
-    (103, "Sector GMT", "NW-SGMT-01", "NH34 GMT", "40mm · steel", None),
-    (104, "Contrail GMT", "NW-CT-01", "NH34 GMT", "40mm · steel", "Ceramic insert only from 2025 on"),
-    (105, "Canyon", "NW-CYN-01", "NH35", "38mm · titanium", None),
-    (106, "Retrospect", "NW-RS-03", "NH35", "38mm · steel", None),
-    (107, "Sector Pilot", "NW-SP-01", "NH35", "40mm · steel", None),
-    (108, "Sector Sport", "NW-SS-01", "NH35", "40mm · steel", None),
-    (109, "Contrail II", "NW-CT2-01", "NH35", "40mm · steel", "Sapphire inlay bezel"),
-    (110, "Duality", "NW-DU-01", "NH35", "38mm · steel", "Inner rotating bezel"),
-    (111, "TrailTrekker", "NW-TT-01", "NH35", "40mm · carbon", None),
-    (112, "Obscura", "NW-OB-01", "NH35", "38mm · steel", None),
-]
-SD, AV2, SGMT, CT, CYN, RS, SP, SS, CT2, DU, TT, OB = (w[0] for w in WATCHES)
-ALL = [w[0] for w in WATCHES]
-SECTOR = [SD, SGMT, SP, SS]
-CONTRAIL = [CT, CT2]
-GMT = [SGMT, CT]
-NON_GMT = [w for w in ALL if w not in GMT]
-MM40 = [SD, SGMT, CT, SP, SS, CT2, TT]
-MM38 = [AV2, CYN, RS, DU, OB]
-SHORT = {SD: "SD", AV2: "AV2", SGMT: "SGMT", CT: "CT", CYN: "CYN", RS: "RS", SP: "SP", SS: "SS", CT2: "CT2", DU: "DU", TT: "TT", OB: "OB"}
-NAME = {w[0]: w[1] for w in WATCHES}
-
-# (sku, name, component, variant, fits)
-PARTS: list[tuple[str, str, str, str | None, list[int]]] = [
-    ("GK-UNI-01", "Gasket set", "gaskets", None, ALL),
-    ("CL-NW-01", "Nodus clasp, signed", "clasp", None, ALL),
-    ("CL-NX-16", "NodeX module, 16mm", "clasp", "16mm", ALL),
-    ("CL-NX-18", "NodeX module, 18mm", "clasp", "18mm", ALL),
-    ("CR-NW-01", "Crown, signed", "crown", None, ALL),
-    ("CT-NW-01", "Casetube", "crown", None, ALL),
-    ("MV-NH35", "NH35 movement", "movement", None, NON_GMT),
-    ("MV-NH34", "NH34 GMT movement", "movement", None, GMT),
-    ("CRY-40-01", "Sapphire crystal, 40mm", "crystal", None, MM40),
-    ("CRY-38-01", "Sapphire crystal, 38mm", "crystal", None, MM38),
-    ("BZ-SD-01", "Bezel insert, Sector Deep", "bezel", "Ceramic", [SD]),
-    ("BZ-SGMT-24", "Bezel insert, Sector GMT 24h", "bezel", None, [SGMT]),
-    ("BZ-CT-01", "Bezel insert, Contrail", "bezel", "Ceramic", [CT]),
-    ("BZ-CT-02", "Bezel insert, Contrail", "bezel", "Steel-Alu", [CT]),
-    ("BZ-CT2-01", "Sapphire inlay, Contrail II", "bezel", "Sapphire", [CT2]),
-    ("BZ-AV2-01", "Bezel insert, Avalon II", "bezel", "Steel", [AV2]),
-    ("BZ-CYN-01", "Bezel insert, Canyon", "bezel", None, [CYN]),
-    ("BZ-RS-01", "Bezel insert, Retrospect", "bezel", None, [RS]),
-    ("BZ-SP-01", "Bezel insert, Sector Pilot", "bezel", None, [SP]),
-    ("BZ-SS-01", "Bezel insert, Sector Sport", "bezel", None, [SS]),
-    ("BZ-DU-01", "Inner bezel, Duality", "bezel", None, [DU]),
-    ("BZ-TT-01", "Bezel, TrailTrekker lumed", "bezel", None, [TT]),
-    ("BZ-OB-01", "Bezel insert, Obscura", "bezel", None, [OB]),
-    ("HD-CT-GMT", "GMT hand", "hands", None, [CT]),
-    ("HD-SGMT-GMT", "GMT hand, Sector", "hands", None, [SGMT]),
-    ("BR-SEC-01", "Sector bracelet", "strap", None, SECTOR),
-    ("BR-CT-01", "Contrail bracelet", "strap", None, CONTRAIL),
-    ("BR-AV2-01", "Avalon bracelet", "strap", None, [AV2]),
-    ("BR-CYN-01", "Canyon bracelet", "strap", None, [CYN]),
-    ("BR-RS-01", "Beads of rice bracelet", "strap", None, [RS]),
-    ("BR-DU-01", "Duality bracelet", "strap", None, [DU]),
-    ("BR-TT-01", "TrailTrekker rubber strap", "strap", None, [TT]),
-    ("BR-OB-01", "Obscura bracelet", "strap", None, [OB]),
-]
-for w in ALL:
-    s = SHORT[w]
-    PARTS.append((f"DL-{s}-01", f"Dial, {NAME[w]}", "dial", None, [w]))
-    PARTS.append((f"HD-{s}-01", f"Hands set, {NAME[w]}", "hands", None, [w]))
-    PARTS.append((f"CS-{s}-01", f"Case, {NAME[w]}", "case", None, [w]))
-
-COMPONENTS = ["bezel", "crystal", "crown", "case", "dial", "hands", "movement", "gaskets", "strap", "clasp"]
-for w in ALL:
-    covered = {p[2] for p in PARTS if w in p[4]}
-    missing = set(COMPONENTS) - covered
-    assert not missing, f"watch {w} missing {missing}"
-
-PART_ID = {sku: uid(200 + i) for i, (sku, *_rest) in enumerate(PARTS)}
-
-emit("-- ---------------------------------------------------------------- catalog (demo)")
-emit("insert into watches (id, workspace_id, brand_id, name, reference, warranty_months, movement, case_spec, notes) values")
-emit(",\n".join(f"  ({q(uid(i))}, {q(WS)}, {q(NODUS)}, {q(n)}, {q(r)}, 24, {q(mv)}, {q(cs)}, {q(notes)})" for i, n, r, mv, cs, notes in WATCHES))
-emit("on conflict (id) do update set name = excluded.name, reference = excluded.reference, movement = excluded.movement, case_spec = excluded.case_spec, notes = excluded.notes, is_active = true;")
-emit()
-emit("insert into parts (id, workspace_id, brand_id, component, name, sku, variant) values")
-emit(",\n".join(f"  ({q(PART_ID[sku])}, {q(WS)}, {q(NODUS)}, {q(comp)}, {q(name)}, {q(sku)}, {q(var)})" for sku, name, comp, var, _ in PARTS))
-emit("on conflict (id) do update set component = excluded.component, name = excluded.name, sku = excluded.sku, variant = excluded.variant, is_active = true;")
-emit()
-emit("-- Demo photos: the objects are uploaded by scripts/seed-photos.mjs; the paths are deterministic so a re-seed keeps them.")
-emit(f"update watches set photo_path = 'watches/' || id::text || '/seed.jpg' where id = {q(uid(103))};")
-emit("update parts set photo_path = 'parts/' || id::text || '/seed.jpg' where sku in ('CL-NW-01', 'BR-TT-01');")
-emit()
-emit("-- Fits are demo configuration: reset them for the demo watches.")
-emit(f"delete from watch_parts where watch_id in ({', '.join(q(uid(w)) for w in ALL)});")
-emit("insert into watch_parts (watch_id, part_id) values")
-emit(",\n".join(f"  ({q(uid(w))}, {q(PART_ID[sku])})" for sku, _, _, _, fits in PARTS for w in fits))
-emit("on conflict do nothing;")
 emit()
 
 # ------------------------------------------------------------------ people
@@ -194,170 +102,338 @@ emit("on conflict (user_id, role, workspace_id, brand_id) do nothing;")
 emit()
 
 # ------------------------------------------------------------------ tickets
-LA = {"line1": "77 Grand Ave", "city": "Los Angeles", "state": "CA", "postal_code": "90013", "country": "US"}
-PATH = ["check_in", "inspect", "supply", "fix", "test", "ship", "closed"]
+STAGES = ["check_in", "inspect", "supply", "repair", "test", "payment", "ship"]
 
 
 def addr(line1, city, state, zip_):
     return {"line1": line1, "city": city, "state": state, "postal_code": zip_, "country": "US"}
 
 
-# Each ticket: a dict describing its state. `age` = days since it was created.
-TICKETS = [
-    dict(n=1, name="Dana Whitmore", email="dana.w@example.com", watch=SD, stage="check_in", age=30, source="sheet",
-         claim="1a0d1be2d8891a0a", serial="5080131", issue="Bezel doesn't click anymore and rotates freely.",
-         ship_to=addr("2234 E Wilson Ave", "Salt Lake City", "UT", "84108"), received=False),
-    dict(n=2, name="Maria Lopez", email="maria@example.com", watch=AV2, stage="inspect", age=24, source="sheet",
-         serial="402376", issue="Second hand stutters and the watch loses about two minutes a day.",
-         ship_to=addr("504 2nd St", "Liverpool", "NY", "13088")),
-    dict(n=3, name="James Whitfield", email="james@example.com", watch=SGMT, stage="supply", age=22, source="sheet",
-         serial="5080093", issue="Crown fell off while setting the time. Dial has a scratch at 10.",
-         ship_to=addr("21 Hampshire Rd", "Midland Park", "NJ", "07432"),
-         findings=[("dial", "scratched", "replace", "DL-SGMT-01", dict(requested=7)),
-                   ("crown", "worn", "replace", "CR-NW-01", dict(have_it=True))],
-         spares=[("CT-NW-01", "Spare casetube", dict(requested=7, arrived=3))],
-         message=("Need 1× Dial, Sector GMT DL-SGMT-01 and a spare casetube CT-NW-01 for NW260003", 7)),
-    dict(n=4, name="Adam Ferguson", email="adam@example.com", phone="(213) 555-0144", watch=CT, stage="fix", age=12,
-         priority=True, coverage="warranty", serial="504004",
-         issue="Bezel doesn't click and rotates freely. Deep scratch on the case at 4 o'clock.", ship_to=LA,
-         findings=[("bezel", "cracked", "replace", "BZ-CT-01", dict(have_it=True, done=3)),
-                   ("case", "scratched", "fix", None, dict()),
-                   ("gaskets", "worn", "replace", "GK-UNI-01", dict(requested=11, arrived=8))],
-         comments=[(RANE, 9, "Case scratch is deeper than it looked at intake. Polishing, not replacing."),
-                   (REP, 7, "Customer asked for an update. Told him early next month.")]),
-    dict(n=5, name="Sarah Chen", email="sarah@example.com", watch=SD, stage="test", age=6, coverage="warranty",
-         serial="5090367", issue="Fogging under the crystal after swimming.", ship_to=addr("11 Tiburon Court", "Manhattan Beach", "CA", "90266"),
-         findings=[("gaskets", "worn", "replace", "GK-UNI-01", dict(have_it=True, done=2)),
-                   ("crystal", "discolored", "fix", None, dict(done=2))],
-         tests=[(1, "time", "pass"), (1, "water", "pass")]),
-    dict(n=6, name="Leo Park", email="leo@example.com", watch=AV2, stage="ship", age=9, coverage="warranty",
-         serial="402385", issue="Running slow, needs regulation.", ship_to=addr("2459 Decatur St", "Denver", "CO", "80211"),
-         findings=[("movement", "worn", "fix", None, dict(done=2))],
-         tests=[(1, "time", "pass"), (1, "water", "pass"), (1, "looks", "pass")],
-         shipment=dict()),
-    dict(n=7, name="Priya Nair", email="priya@example.com", watch=CT, stage="closed", age=40, closed=36, coverage="warranty",
-         serial="504018", issue="Lume barely glows on the hour markers.", ship_to=addr("9337 Hillside Dr", "Champlin", "MN", "55316"),
-         findings=[("dial", "discolored", "replace", "DL-CT-01", dict(have_it=True, done=38))],
-         tests=[(1, "time", "pass"), (1, "water", "pass"), (1, "looks", "pass")],
-         bench_minutes=95, shipment=dict(carrier="usps", tracking="9400 1108 4007 2231 0001", shipped=36)),
-    dict(n=8, name="Tom Reyes", email="tom@example.com", watch=SGMT, stage="closed", age=50, closed=44, coverage="paid",
-         needs_payment=True, payment_amount=55, payment_received=True,
-         serial="5030761", issue="Clasp would not stay closed. Out of warranty.", ship_to=addr("7218 Murray Lane", "Annandale", "VA", "22003"),
-         findings=[("clasp", "worn", "replace", "CL-NW-01", dict(have_it=True, done=46))],
-         tests=[(1, "time", "pass"), (1, "water", "pass"), (1, "looks", "fail"),
-                (2, "time", "pass"), (2, "water", "pass"), (2, "looks", "pass")],
-         sent_back=47,
-         bench_minutes=40, shipment=dict(carrier="ups", tracking="1Z 999 AA1 01 2345 6784", signature=True, shipped=44)),
-    dict(n=9, name="Owen Brooks", email="owen@example.com", watch=TT, stage="check_in", age=2, return_to_everett=True,
+def step(answer=None, notes=None, done=None, by=None, skipped=False):
+    """One ticket_steps row. `done` is days ago."""
+    return dict(answer=answer, notes=notes, done=done, by=by, skipped=skipped)
+
+
+def slack(kind, ago, body, replies=0, last_reply=None, by=None):
+    return dict(channel="slack", kind=kind, ago=ago, body=body, replies=replies, last_reply=last_reply, by=by or RANE, status="sent", ts=f"17{int(ago * 86400):09d}.000100")
+
+
+def email(kind, ago, to, subject, body):
+    return dict(channel="email", kind=kind, ago=ago, body=body, recipient=to, subject=subject, by=RANE, status="logged", replies=0)
+
+
+RECEIVED_SUBJECT = "We received your watch"
+SHIPPED_SUBJECT = "Your watch is on its way"
+
+
+def received_email(t, ago):
+    return email("received", ago, t["email"], RECEIVED_SUBJECT, f"Hi {t['name'].split()[0]}, your {t['watch']} is on the bench. Ticket {t['number']}. We'll write again when it ships.")
+
+
+def shipped_email(t, ago, tracking):
+    return email("shipped", ago, t["email"], SHIPPED_SUBJECT, f"Hi {t['name'].split()[0]}, your {t['watch']} shipped today. Tracking: {tracking}. Ticket {t['number']}.")
+
+
+# Each ticket: intake data, the current stage, one entry per step, and the
+# messages, tests and comments around them. Days are "ago".
+PASS3 = lambda ago, attempt=1: [(attempt, k, "pass", ago, None) for k in ("time", "water", "looks")]  # noqa: E731
+
+TICKETS: list[dict] = [
+    # ---------------------------------------------------------- Check in (3)
+    dict(n=11, name="Michael Becker", email="michael.b@example.com", watch="Canyon", stage="check_in", age=9, source="sheet",
+         claim="7c1d2be2d8891a4f", serial="612044", issue="Second hand stopped. Watch was fully wound and worn daily.",
+         ship_to=addr("18 Linden Way", "Portland", "OR", "97214"),
+         steps={}),
+    dict(n=13, name="Bobby Fisher", email="bobby.f@example.com", watch="Avalon II", stage="check_in", age=9, source="sheet",
+         claim="91ab2be2d8891c22", serial="402511", issue="Bracelet pin fell out and the clasp no longer closes.",
+         ship_to=addr("2200 Pine St", "Boulder", "CO", "80302"),
+         steps={}),
+    dict(n=17, name="Matthew Stanley", email="matt.stanley@example.com", watch="Sector Pilot", stage="check_in", age=3,
+         serial="5090821", issue="Crown won't screw down. Possibly cross-threaded.", bench_note="Dropped off in person, box and papers included.",
+         ship_to=addr("411 Cedar Ave", "Spokane", "WA", "99201"),
+         steps={}),
+
+    # ---------------------------------------------------------- Inspect · parked (1)
+    dict(n=9, name="Owen Brooks", email="owen@example.com", watch="TrailTrekker", stage="inspect", age=3, return_to_everett=True,
          serial="1292", issue="New watch arrived with a divot in the bezel near 10. Customer is returning it.",
-         ship_to=addr("35475 Marabella Ct", "Winchester", "CA", "92596")),
+         ship_to=addr("35475 Marabella Ct", "Winchester", "CA", "92596"),
+         steps={"check_in": step(True, done=2, by=WES),
+                "inspect": step(False, "Bezel divot is cosmetic and inside spec. Bezel clicks and aligns. Pressure tested to 200 m, +2 s/d over 24 h. Nothing to repair.")},
+         messages=[slack("cannot_replicate", 1,
+                         "Cannot replicate reported issue · NW260009 · TrailTrekker · Owen Brooks\nReported: New watch arrived with a divot in the bezel near 10.\nRane: Bezel divot is cosmetic and inside spec. Bezel clicks and aligns. Pressure tested to 200 m, +2 s/d over 24 h. Nothing to repair.",
+                         replies=1, last_reply="Asking the customer for a photo of the divot.", by=WES)]),
+
+    # ---------------------------------------------------------- Supply · waiting (1)
+    dict(n=3, name="James Whitfield", email="james@example.com", watch="Sector GMT", stage="supply", age=29, source="sheet",
+         claim="1a0d1be2d8891a0a", serial="5080093", issue="Crown fell off while setting the time. Dial has a scratch at 10.",
+         ship_to=addr("21 Hampshire Rd", "Midland Park", "NJ", "07432"),
+         steps={"check_in": step(True, done=28, by=REP),
+                "inspect": step(True, "Crown tube is stripped, crown will not seat. Dial scratch at 10 goes through the lacquer, needs a new dial. Movement runs +4 s/d.", done=6, by=WES),
+                "supply": step(False, "1× Dial, Sector GMT (black)\n1× Crown, signed\n1× Crown tube")},
+         messages=[slack("parts_needed", 5,
+                         "Parts needed · NW260003 · Sector GMT · James Whitfield\n1× Dial, Sector GMT (black)\n1× Crown, signed\n1× Crown tube\nInspection: Crown tube is stripped, crown will not seat. Dial scratch at 10 goes through the lacquer, needs a new dial.",
+                         replies=2, last_reply="Dial ships Thursday", by=WES)],
+         photos=[("customer", "seed.jpg")]),
+
+    # ---------------------------------------------------------- Repair (1)
+    dict(n=16, name="Tyler McDonald", email="tyler.m@example.com", watch="Avalon II", stage="repair", age=12, coverage="warranty",
+         serial="402390", issue="Winding feels gritty and the date doesn't change at midnight.",
+         ship_to=addr("77 Grand Ave", "Los Angeles", "CA", "90013"),
+         steps={"check_in": step(True, done=12, by=REP),
+                "inspect": step(True, "Crown gritty, date wheel jumps late. Keyless works dry. Movement service needed.", done=9, by=RANE),
+                "supply": step(True, done=8, by=RANE),
+                "repair": step(None, "Movement out, keyless works cleaned and oiled.")}),
+
+    # ---------------------------------------------------------- Test (2)
+    dict(n=2, name="Maria Lopez", email="maria@example.com", watch="Avalon II", stage="test", age=20, source="sheet",
+         claim="4f2d1be2d8891b77", serial="402376", issue="Second hand stutters and the watch loses about two minutes a day.",
+         ship_to=addr("504 2nd St", "Liverpool", "NY", "13088"),
+         steps={"check_in": step(True, done=19, by=REP),
+                "inspect": step(True, "Low amplitude, 190°. Mainspring tired and gaskets hardened.", done=15, by=RANE),
+                "supply": step(True, done=15, by=RANE),
+                "repair": step(True, "Movement regulated, mainspring and gaskets replaced.", done=4, by=RANE),
+                "test": step(None, "+3 s/d dial up, amplitude 275°. 100 m pass.")},
+         tests=PASS3(1)),
+    dict(n=4, name="Adam Ferguson", email="adam@example.com", phone="(213) 555-0144", watch="Contrail GMT", stage="test", age=12,
+         priority=True, coverage="warranty", serial="504004",
+         issue="Bezel doesn't click and rotates freely. Deep scratch on the case at 4 o'clock.",
+         ship_to=addr("77 Grand Ave", "Los Angeles", "CA", "90013"),
+         steps={"check_in": step(True, done=12, by=REP),
+                "inspect": step(True, "Bezel click spring broken, insert cracked at 4. Case scratch is deeper than it looked at intake; polishing, not replacing.", done=10, by=RANE),
+                "supply": step(False, "1× Bezel click spring\n1× Bezel insert, Contrail GMT (ceramic)", done=4, by=RANE),
+                "repair": step(True, "Click spring and bezel insert replaced. Case polished at 4.", done=3, by=RANE),
+                "test": step(None, None)},
+         messages=[slack("parts_needed", 7,
+                         "Parts needed · NW260004 · Contrail GMT · Adam Ferguson\n1× Bezel click spring\n1× Bezel insert, Contrail GMT (ceramic)\nInspection: Bezel click spring broken, insert cracked at 4.",
+                         replies=1, last_reply="Both in the Monday shipment.")],
+         comments=[(RANE, 9, "Case scratch is deeper than it looked at intake. Polishing, not replacing."),
+                   (REP, 7, "Customer asked for an update. Told him early next week.")]),
+
+    # ---------------------------------------------------------- Payment (1)
+    dict(n=5, name="Sarah Chen", email="sarah@example.com", watch="Sector Deep", stage="payment", age=30, coverage="paid",
+         needs_payment=True, payment_amount=180, invoice_sent=12,
+         serial="5090367", issue="Gritty crown and losing about two minutes a day. Out of warranty.",
+         ship_to=addr("11 Tiburon Court", "Manhattan Beach", "CA", "90266"),
+         steps={"check_in": step(True, done=30, by=REP),
+                "inspect": step(True, "Gritty crown, −2 min/day. Gaskets hardened, movement needs regulation.", done=29, by=RANE),
+                "supply": step(True, done=28, by=RANE),
+                "repair": step(True, "Gaskets replaced, movement regulated.", done=22, by=RANE),
+                "test": step(True, "Timekeeping, water resistance, visual all pass.", done=12, by=RANE),
+                "payment": step(None)},
+         tests=PASS3(12)),
+
+    # ---------------------------------------------------------- Ship (1)
+    dict(n=6, name="Leo Park", email="leo@example.com", watch="Avalon II", stage="ship", age=20, coverage="warranty",
+         serial="402385", issue="Bezel insert cracked after a knock against a door frame.",
+         ship_to=addr("506 Market St", "Los Angeles", "CA", "90013"),
+         steps={"check_in": step(True, done=20, by=REP),
+                "inspect": step(True, "Cracked bezel insert. Case and crystal fine.", done=19, by=RANE),
+                "supply": step(True, done=19, by=RANE),
+                "repair": step(True, "Bezel insert replaced.", done=11, by=RANE),
+                "test": step(True, "All pass.", done=1, by=RANE),
+                "payment": step(skipped=True, done=1, by=RANE)},
+         tests=PASS3(1),
+         ship=dict(carrier="USPS Priority", tracking="9405 5118 9922 0310 4471 02", label="https://example.com/labels/NW260006.pdf")),
+
+    # ---------------------------------------------------------- Closed (7)
+    dict(n=7, name="Tom Reyes", email="tom@example.com", watch="Sector GMT", stage="closed", age=59, coverage="warranty",
+         serial="5030761", issue="Clasp would not stay closed.",
+         ship_to=addr("7218 Murray Lane", "Annandale", "VA", "22003"),
+         steps={"check_in": step(True, done=59, by=REP),
+                "inspect": step(True, "Clasp spring bar bent, clasp worn.", done=58, by=RANE),
+                "supply": step(True, done=58, by=RANE),
+                "repair": step(True, "Clasp replaced.", done=51, by=RANE),
+                "test": step(True, "All pass on the second attempt.", done=49, by=RANE),
+                "payment": step(skipped=True, done=49, by=RANE),
+                "ship": step(done=47, by=RANE)},
+         tests=[(1, "time", "pass", 50, None), (1, "water", "pass", 50, None), (1, "looks", "fail", 50, "Smudge under the crystal")] + PASS3(49, 2),
+         sent_back=50,
+         ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0001"),
+         photos=[("bench", "seed.jpg")]),
+    dict(n=8, name="Priya Nair", email="priya@example.com", watch="Contrail GMT", stage="closed", age=55, coverage="paid",
+         needs_payment=True, payment_amount=95, invoice_sent=47,
+         serial="504018", issue="Crystal chipped at the edge. Out of warranty.",
+         ship_to=addr("9337 Hillside Dr", "Champlin", "MN", "55316"),
+         steps={"check_in": step(True, done=55, by=REP),
+                "inspect": step(True, "Crystal chipped at 2, gasket intact.", done=54, by=RANE),
+                "supply": step(True, done=54, by=RANE),
+                "repair": step(True, "Crystal replaced, pressure tested.", done=48, by=RANE),
+                "test": step(True, "All pass.", done=47, by=RANE),
+                "payment": step(True, done=45, by=REP),
+                "ship": step(done=44, by=RANE)},
+         tests=PASS3(47),
+         ship=dict(carrier="UPS", tracking="1Z 999 AA1 01 2345 6784")),
+    dict(n=19, name="Lena Park", email="lena.park@example.com", watch="Sector Deep", stage="closed", age=46, coverage="warranty",
+         serial="5090412", issue="Watch stops overnight.",
+         ship_to=addr("88 Ocean Blvd", "Santa Cruz", "CA", "95060"),
+         steps={"check_in": step(True, done=46, by=REP),
+                "inspect": step(False, "Ran 72 h on the winder and on the wrist, no stop. Power reserve 41 h. Customer likely under-winding.", done=42, by=RANE),
+                "supply": step(skipped=True, done=42, by=RANE),
+                "repair": step(skipped=True, done=42, by=RANE),
+                "test": step(skipped=True, done=42, by=RANE),
+                "payment": step(skipped=True, done=42, by=RANE),
+                "ship": step(done=41, by=RANE)},
+         skipped=42,
+         messages=[slack("cannot_replicate", 44,
+                         "Cannot replicate reported issue · NW260019 · Sector Deep · Lena Park\nReported: Watch stops overnight.\nRane: Ran 72 h on the winder and on the wrist, no stop. Power reserve 41 h.",
+                         replies=1, last_reply="Customer agrees, send it back with winding instructions.")],
+         ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0042")),
+    dict(n=14, name="Marcus Hill", email="marcus.h@example.com", watch="Canyon", stage="closed", age=66, coverage="warranty",
+         serial="612008", issue="Running fast, about a minute a day.",
+         ship_to=addr("300 W 5th St", "Austin", "TX", "78701"),
+         steps={"check_in": step(True, done=66, by=REP),
+                "inspect": step(True, "+58 s/d, magnetised.", done=65, by=RANE),
+                "supply": step(True, done=65, by=RANE),
+                "repair": step(True, "Demagnetised and regulated.", done=56, by=RANE),
+                "test": step(True, "All pass.", done=55, by=RANE),
+                "payment": step(skipped=True, done=55, by=RANE),
+                "ship": step(done=54, by=RANE)},
+         tests=PASS3(55),
+         ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0014")),
+    dict(n=10, name="Jenna Ortiz", email="jenna.o@example.com", watch="Avalon II", stage="closed", age=74, coverage="warranty",
+         serial="402299", issue="Fogging under the crystal after swimming.",
+         ship_to=addr("1420 Elm St", "Dallas", "TX", "75201"),
+         steps={"check_in": step(True, done=74, by=REP),
+                "inspect": step(True, "Caseback gasket flattened. Crystal gasket fine.", done=73, by=RANE),
+                "supply": step(True, done=73, by=RANE),
+                "repair": step(True, "Gaskets replaced. Pressure retest after the first failed.", done=65, by=RANE),
+                "test": step(True, "Second pressure test clean to 100 m.", done=63, by=RANE),
+                "payment": step(skipped=True, done=63, by=RANE),
+                "ship": step(done=62, by=RANE)},
+         tests=[(1, "time", "pass", 66, None), (1, "water", "fail", 66, "Leak at the caseback on the first test")] + PASS3(63, 2),
+         sent_back=66,
+         ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0010")),
+    dict(n=1, name="Sam Whitaker", email="sam.w@example.com", watch="Sector Pilot", stage="closed", age=80, coverage="paid",
+         needs_payment=True, payment_amount=120, invoice_sent=68,
+         serial="5090102", issue="Bezel insert faded and chipped. Out of warranty.",
+         ship_to=addr("9 Harbor View", "Newport", "RI", "02840"),
+         steps={"check_in": step(True, done=80, by=REP),
+                "inspect": step(True, "Bezel insert chipped at 12 and faded.", done=78, by=RANE),
+                "supply": step(True, done=78, by=RANE),
+                "repair": step(True, "Bezel insert replaced.", done=69, by=RANE),
+                "test": step(True, "All pass.", done=68, by=RANE),
+                "payment": step(True, done=67, by=REP),
+                "ship": step(done=66, by=RANE)},
+         tests=PASS3(68),
+         ship=dict(carrier="FedEx", tracking="7489 2231 0001")),
+    dict(n=12, name="Dana Whitmore", email="dana.w@example.com", watch="Sector Deep", stage="closed", age=90, source="sheet", coverage="warranty",
+         claim="1a0d1be2d8891a0b", serial="5080131", issue="Crown tube loose, crown wobbles.",
+         ship_to=addr("2234 E Wilson Ave", "Salt Lake City", "UT", "84108"),
+         steps={"check_in": step(True, done=89, by=REP),
+                "inspect": step(True, "Crown tube loose in the case.", done=88, by=RANE),
+                "supply": step(True, done=88, by=RANE),
+                "repair": step(True, "Crown tube replaced and pressure fitted.", done=77, by=RANE),
+                "test": step(True, "All pass.", done=76, by=RANE),
+                "payment": step(skipped=True, done=76, by=RANE),
+                "ship": step(done=75, by=RANE)},
+         tests=PASS3(76),
+         ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0012")),
 ]
 
-ticket_rows, finding_rows, test_rows, ship_rows, event_rows, supply_rows, spare_rows = [], [], [], [], [], [], []
+ticket_rows, step_rows, event_rows, message_rows, test_rows, photo_rows = [], [], [], [], [], []
 eid = 4300
-fid = 4100
+mid = 4400
 xid = 4500
-sid = 4600
+pid = 4600
 ticket_ids = []
 
 for t in TICKETS:
-    tid = 4000 + t["n"]
+    n = t["n"]
+    tid = uid(4000 + n)
     ticket_ids.append(tid)
-    number = f"NW26{t['n']:04d}"
+    t["number"] = f"NW26{n:04d}"
     stage = t["stage"]
-    reached = PATH.index(stage)
     age = t["age"]
-    closed_age = t.get("closed")
-    received = t.get("received", True)
+    steps = {s: t["steps"].get(s, step()) for s in STAGES}
+    ship_done = steps["ship"]["done"]
+    closed_at = ship_done if stage == "closed" else None
+    ship = t.get("ship", {})
+    test_attempt = max([a for a, *_ in t.get("tests", [])] + [1])
+    last_touch = min([s["done"] for s in steps.values() if s["done"] is not None] + [age] + [m["ago"] for m in t.get("messages", [])])
+
     ticket_rows.append(
-        f"  ({q(uid(tid))}, {q(number)}, {q(WS)}, {q(NODUS)}, {q(uid(t['watch']))}, {q(stage)}, {q(t.get('source', 'by_hand'))}, {q(t.get('claim'))}, "
-        f"{q(REP)}, {q(t['name'])}, {q(t['email'])}, {q(t.get('phone'))}, {q(t['ship_to'])}, {q(NAME[t['watch']])}, {q(t.get('serial'))}, {q(t['issue'])}, "
-        f"{q(t.get('coverage'))}, {q(t.get('priority', False))}, {q(t.get('needs_payment', False))}, {q(t.get('payment_amount'))}, {q(t.get('payment_received', False))}, {q(t.get('return_to_everett', False))}, "
-        f"{days(age) if received else 'null'}, {max(a for a, *_ in t.get('tests', [(1,)]))}, {q(t.get('bench_minutes'))}, {days(closed_age) if closed_age else 'null'}, {days(age)}, {days(max(age - 3 * reached, 0.5))})"
+        f"  ({q(tid)}, {q(t['number'])}, {q(WS)}, {q(NODUS)}, {q(t['watch'])}, {q(stage)}, {q(t.get('source', 'by_hand'))}, {q(t.get('claim'))}, {q(REP)}, "
+        f"{q(t['name'])}, {q(t['email'])}, {q(t.get('phone'))}, {q(t['ship_to'])}, {q(t.get('serial'))}, {q(t['issue'])}, {q(t.get('bench_note'))}, "
+        f"{q(t.get('coverage'))}, {q(t.get('priority', False))}, {q(t.get('needs_payment', False))}, {q(t.get('payment_amount'))}, {days(t.get('invoice_sent'))}, {q(t.get('return_to_everett', False))}, "
+        f"{test_attempt}, {q(ship.get('carrier'))}, {q(ship.get('tracking'))}, {q(ship.get('label'))}, {days(closed_at)}, {days(age)}, {days(last_touch)})"
     )
-    # timeline: created, then one stage_changed per step reached, evenly spaced
+
+    for s in STAGES:
+        st = steps[s]
+        step_rows.append(f"  ({q(tid)}, {q(s)}, {q(st['answer'])}, {q(st['notes'])}, {days(st['done'])}, {q(st['by'] if st['done'] is not None else None)}, {q(st['skipped'])})")
+
+    # Timeline: created, then one move per finished step.
     eid += 1
-    event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'created', {q(REP)}, null, 'check_in', null, {days(age)}, null)")
-    span = age - (closed_age or 0.5)
-    for i in range(1, reached + 1):
-        at = age - span * i / (reached + (0 if stage == 'closed' else 1))
-        actor = REP if PATH[i - 1] == "check_in" else RANE
-        if t.get("sent_back") and PATH[i] == "ship":
-            # a failed test round trip before the final pass
+    event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'created', {q(REP)}, null, 'check_in', null, {days(age)}, {q({'source': t.get('source', 'by_hand')})})")
+    for i, s in enumerate(STAGES):
+        st = steps[s]
+        if st["done"] is None or st["skipped"]:
+            continue
+        # the next step that was not skipped, or closed after ship
+        nxt = next((x for x in STAGES[i + 1:] if not steps[x]["skipped"]), "closed")
+        if t.get("skipped") and s == "inspect":
             eid += 1
-            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'sent_back', {q(RANE)}, 'test', 'fix', 'Looks failed: smudge under the crystal', {days(t['sent_back'])}, null)")
+            event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'skipped', {q(st['by'])}, 'inspect', {q(nxt)}, 'Nothing wrong: skipped Supply, Repair and Test', {days(st['done'])}, null)")
+        else:
             eid += 1
-            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'stage_changed', {q(RANE)}, 'fix', 'test', null, {days(t['sent_back'] - 1)}, null)")
+            event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'stage_changed', {q(st['by'])}, {q(s)}, {q(nxt)}, null, {days(st['done'])}, null)")
+    if t.get("sent_back"):
+        fail = next(x for x in t["tests"] if x[2] == "fail")
         eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'stage_changed', {q(actor)}, {q(PATH[i - 1])}, {q(PATH[i])}, null, {days(at)}, null)")
-    if t.get("message"):
-        body, when = t["message"]
+        event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'sent_back', {q(RANE)}, 'test', 'repair', null, {days(t['sent_back'])}, null)")
         eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'parts_requested', {q(RANE)}, null, null, {q(body)}, {days(when)}, null)")
+        event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'comment', {q(RANE)}, null, null, {q(f'{fail[1].capitalize()} check failed: {fail[4]}. Back to Repair.')}, {days(t['sent_back'])}, null)")
+        eid += 1
+        event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'stage_changed', {q(RANE)}, 'repair', 'test', null, {days(t['sent_back'] - 0.5)}, null)")
     for actor, when, body in t.get("comments", []):
         eid += 1
-        event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'comment', {q(actor)}, null, null, {q(body)}, {days(when)}, null)")
-    EMAILS = {"inspect": ("request_received", "Request received"), "fix": ("repair_in_progress", "Repair in progress"),
-              "test": ("testing", "Testing"), "closed": ("on_its_way", "On its way")}
-    for i in range(1, reached + 1):
-        if PATH[i] in EMAILS:
-            template, subject = EMAILS[PATH[i]]
-            at = age - span * i / (reached + (0 if stage == 'closed' else 1))
-            eid += 1
-            event_rows.append(f"  ({q(uid(eid))}, {q(uid(tid))}, 'email_logged', {q(RANE if PATH[i] != 'inspect' else REP)}, null, null, {q(subject)}, {days(at)}, {q({'template': template})})")
-    for comp, cond, action, sku, extra in t.get("findings", []):
-        fid += 1
-        finding_rows.append(
-            f"  ({q(uid(fid))}, {q(uid(tid))}, {q(comp)}, {q(cond)}, {q(action)}, {q(PART_ID[sku]) if sku else 'null'}, 'inspect', "
-            f"{days(extra['done']) if 'done' in extra else 'null'}, {q(RANE) if 'done' in extra else 'null'}, {q(RANE)})"
-        )
-        if action == "replace" and sku and any(k in extra for k in ("have_it", "requested", "arrived")):
-            supply_rows.append(
-                f"update ticket_parts set have_it = {q(extra.get('have_it', False))}, requested_at = {days(extra['requested']) if 'requested' in extra else 'null'}, "
-                f"arrived_at = {days(extra['arrived']) if 'arrived' in extra else 'null'} where finding_id = {q(uid(fid))};"
-            )
-    for sku, label, extra in t.get("spares", []):
-        spare_rows.append(
-            f"  ({q(uid(tid))}, null, {q(PART_ID[sku])}, {q(label)}, {q(extra.get('have_it', False))}, "
-            f"{days(extra['requested']) if 'requested' in extra else 'null'}, {days(extra['arrived']) if 'arrived' in extra else 'null'}, {q(RANE)})"
-        )
-    for attempt, kind, result in t.get("tests", []):
-        xid += 1
-        test_rows.append(f"  ({q(uid(xid))}, {q(uid(tid))}, {attempt}, {q(kind)}, {q(result)}, {q(RANE)}, {days((closed_age or 1) + 1)})")
-    if "shipment" in t:
-        s = t["shipment"]
-        sid += 1
-        ship_rows.append(
-            f"  ({q(uid(sid))}, {q(uid(tid))}, {q(s.get('carrier'))}, {q(s.get('tracking'))}, false, true, {q(s.get('signature', False))}, {q(t['ship_to'])}, "
-            f"{days(s['shipped']) if 'shipped' in s else 'null'}, {q(RANE)})"
+        event_rows.append(f"  ({q(uid(eid))}, {q(tid)}, 'comment', {q(actor)}, null, null, {q(body)}, {days(when)}, null)")
+
+    # Messages: the two customer emails are logged, Slack posts carry a ts and replies.
+    messages = list(t.get("messages", []))
+    if steps["check_in"]["done"] is not None:
+        messages.append(received_email(t, steps["check_in"]["done"]))
+    if ship_done is not None:
+        messages.append(shipped_email(t, ship_done, ship.get("tracking", "")))
+    for m in messages:
+        mid += 1
+        message_rows.append(
+            f"  ({q(uid(mid))}, {q(tid)}, {q(m['channel'])}, {q(m['kind'])}, {q(m.get('recipient'))}, {q(m.get('subject'))}, {q(m['body'])}, {q(m['status'])}, "
+            f"{q(m.get('ts'))}, {m.get('replies', 0)}, {q(m.get('last_reply'))}, {days(m['ago'] - 0.1) if m.get('replies') else 'null'}, {q(m['by'])}, {days(m['ago'])})"
         )
 
+    for attempt, kind, result, ago, note in t.get("tests", []):
+        xid += 1
+        test_rows.append(f"  ({q(uid(xid))}, {q(tid)}, {attempt}, {q(kind)}, {q(result)}, {q(note)}, {q(RANE)}, {days(ago)})")
+
+    for i, (kind, file) in enumerate(t.get("photos", [])):
+        pid += 1
+        photo_rows.append(f"  ({q(uid(pid))}, {q(tid)}, {q(kind)}, {q(f'tickets/{tid}/{file}')}, {i}, {q(RANE)}, {days(age - 0.5)})")
+
 emit("-- ---------------------------------------------------------------- demo tickets")
-emit("-- The bench from the mocks: one ticket per stage plus closed ones. Reset on every run;")
-emit("-- tickets created through the app keep their own ids and are never touched.")
-emit(f"delete from tickets where id in ({', '.join(q(uid(t)) for t in ticket_ids)});")
+emit("-- The bench from the handoff: ten open tickets across the steps plus seven closed. Reset on")
+emit("-- every run; tickets created through the app keep their own ids and are never touched.")
+emit(f"delete from tickets where id in ({', '.join(q(t) for t in ticket_ids)});")
 emit("alter table tickets disable trigger tickets_updated_at;")
-emit("insert into tickets (id, number, workspace_id, brand_id, watch_id, stage, source, claim_ref, created_by, customer_name, customer_email, customer_phone, ship_to, customer_model_text, serial, issue, coverage, priority, needs_payment, payment_amount, payment_received, return_to_everett, received_at, test_attempt, bench_minutes, closed_at, created_at, updated_at) values")
+emit("insert into tickets (id, number, workspace_id, brand_id, watch, stage, source, claim_ref, created_by, customer_name, customer_email, customer_phone, ship_to, serial, issue, bench_note, coverage, priority, needs_payment, payment_amount, invoice_sent_at, return_to_everett, test_attempt, ship_carrier, ship_tracking, label_url, closed_at, created_at, updated_at) values")
 emit(",\n".join(ticket_rows) + ";")
 emit("alter table tickets enable trigger tickets_updated_at;")
+emit()
+emit("insert into ticket_steps (ticket_id, stage, answer, notes, done_at, done_by, skipped) values")
+emit(",\n".join(step_rows) + ";")
 emit()
 emit("insert into ticket_events (id, ticket_id, type, actor_id, from_stage, to_stage, body, created_at, payload) values")
 emit(",\n".join(event_rows) + ";")
 emit()
-emit("-- Inserting a Replace finding creates its ticket_parts row (trigger); supply state is set after.")
-emit("insert into ticket_findings (id, ticket_id, component, condition, action, part_id, found_at_stage, done_at, done_by, created_by) values")
-emit(",\n".join(finding_rows) + ";")
-emit("\n".join(supply_rows))
+emit("-- Emails are logged, not sent, until the sheet's addresses are scrubbed and a mailer is switched on.")
+emit("insert into ticket_messages (id, ticket_id, channel, kind, recipient, subject, body, status, external_id, reply_count, last_reply, replies_checked_at, created_by, created_at) values")
+emit(",\n".join(message_rows) + ";")
 emit()
-if spare_rows:
-    emit("-- Extra parts the watchmaker asked for beyond the findings.")
-    emit("insert into ticket_parts (ticket_id, finding_id, part_id, label, have_it, requested_at, arrived_at, created_by) values")
-    emit(",\n".join(spare_rows) + ";")
-    emit()
-emit("insert into ticket_tests (id, ticket_id, attempt, kind, result, created_by, created_at) values")
+emit("insert into ticket_tests (id, ticket_id, attempt, kind, result, note, created_by, created_at) values")
 emit(",\n".join(test_rows) + ";")
 emit()
-emit("insert into shipments (id, ticket_id, carrier, tracking, handed_over, email_customer, signature_required, ship_to, shipped_at, created_by) values")
-emit(",\n".join(ship_rows) + ";")
+emit("-- Demo photos: the objects are uploaded by scripts/seed-photos.mjs; the paths are deterministic so a re-seed keeps them.")
+emit("insert into ticket_photos (id, ticket_id, kind, storage_path, sort, uploaded_by, created_at) values")
+emit(",\n".join(photo_rows) + ";")
 emit()
 print("\n".join(out))

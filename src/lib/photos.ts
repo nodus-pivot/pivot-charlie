@@ -1,14 +1,14 @@
 /**
- * Photos live in the private "photos" bucket under tickets/<id>/, watches/<id>/
- * or parts/<id>/. The browser uploads straight to Storage (RLS decides), then
- * a server action records the path. Pages read them back through /api/photo,
- * which streams the object as the signed-in person.
+ * Photos live in the private "photos" bucket under tickets/<id>/. The browser
+ * uploads straight to Storage (RLS decides), then a server action records the
+ * path. Pages read them back through /api/photo, which streams the object as
+ * the signed-in person.
  */
 
 export const PHOTO_MAX_EDGE = 1600;
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 
-export type PhotoFolder = "tickets" | "watches" | "parts";
+export type PhotoFolder = "tickets";
 
 export function photoUrl(path: string): string {
   return `/api/photo?p=${encodeURIComponent(path)}`;

@@ -11,7 +11,6 @@ import { getCurrentUser } from "@/features/auth/queries";
 import { canIntake } from "@/features/auth/permissions";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { NewTicketForm } from "@/features/intake/components/new-ticket";
-import { getCatalog } from "@/features/intake/queries";
 import { getVisibleBrands, getWorkspaceContext } from "@/features/workspaces/queries";
 
 export const metadata: Metadata = { title: "New ticket" };
@@ -30,7 +29,7 @@ export default async function NewTicketPage() {
       </section>
     );
   }
-  const [catalog, totals] = await Promise.all([getCatalog(brand.id), countTickets(ws.current.id)]);
+  const totals = await countTickets(ws.current.id);
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
 
   return (
@@ -55,7 +54,7 @@ export default async function NewTicketPage() {
             </Link>
           </span>
         </div>
-        <NewTicketForm catalog={catalog} brandId={brand.id} />
+        <NewTicketForm brandId={brand.id} />
       </section>
     </>
   );

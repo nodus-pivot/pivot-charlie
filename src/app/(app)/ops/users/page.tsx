@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Users" };
 export default async function UsersPage() {
   const [user, ws, brands] = await Promise.all([getCurrentUser(), getWorkspaceContext(), getVisibleBrands()]);
   if (!user) redirect(SIGN_IN_PATH);
-  if (!ws.current || !canOpenOpsPage(user.grants, "users", ws.current.id)) redirect("/ops/watches");
+  if (!ws.current || !canOpenOpsPage(user.grants, "users", ws.current.id)) redirect("/service-center");
   const people = await listPeople();
   const first = user.profile.display_name.split(/\s+/)[0] ?? "";
   return (

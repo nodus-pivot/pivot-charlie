@@ -22,12 +22,11 @@ export const addressInput = z.object({
 /** What both intake forms send. `sheet` is present only from Incoming. */
 export const ticketInput = z.object({
   brandId: z.uuid(),
-  watchId: z.uuid({ message: "Pick a catalog model." }),
+  watch: z.string().trim().min(1, "Which watch is it?").max(120),
   customerName: z.string().trim().min(1, "Enter the customer's name.").max(200),
   customerEmail: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.")),
   customerPhone: optional,
   shipTo: addressInput,
-  modelText: optional,
   serial: optional,
   issue: z.string().trim().min(1, "What did the customer say?").max(5000),
   benchNote: optional,

@@ -19,9 +19,7 @@ export type DossierData = {
   customer_email: string | null;
   customer_phone: string | null;
   ship_to: Address | null;
-  watch_id: string;
-  watch_name: string;
-  warranty_months: number | null;
+  watch: string;
   serial: string | null;
   coverage: "warranty" | "paid" | null;
   received_at: string | null;
@@ -29,7 +27,6 @@ export type DossierData = {
   bench_note: string | null;
   photos: { id: string; path: string; kind: "customer" | "bench" }[];
   comments: { id: string; actor: string; date: string; body: string }[];
-  catalog: { id: string; name: string; warranty_months: number | null }[];
 };
 
 type Fields = DetailsInput;
@@ -47,7 +44,7 @@ function fieldsFrom(d: DossierData): Fields {
       postal_code: d.ship_to?.postal_code ?? "",
       country: d.ship_to?.country ?? "US",
     },
-    watchId: d.watch_id,
+    watch: d.watch,
     serial: d.serial ?? "",
     coverage: d.coverage,
   };
@@ -85,11 +82,7 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
     });
   }
 
-  const watch = data.catalog.find((w) => w.id === fields.watchId);
-  const coverageText =
-    fields.coverage === "paid"
-      ? "Out of warranty · paid"
-      : `Warranty${(watch?.warranty_months ?? data.warranty_months) ? ` · ${watch?.warranty_months ?? data.warranty_months} mo` : ""}`;
+  const coverageText = fields.coverage === "paid" ? "Out of warranty · paid" : "Warranty";
 
   return (
     <aside className="flex w-full flex-none flex-col border-b border-rule px-4 pb-8 pt-8 sm:px-8 lg:w-[380px] lg:border-b-0 lg:border-r lg:pl-12 lg:pr-9">
@@ -132,20 +125,7 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
           )}
         </Row>
         <Row label="Watch">
-          {editable ? (
-            <select
-              value={fields.watchId}
-              onChange={(e) => { patch({ watchId: e.target.value }); save({ watchId: e.target.value }); }}
-              className="w-full bg-transparent text-base text-ink outline-none [&>option]:bg-panel"
-              aria-label="Watch model"
-            >
-              {data.catalog.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          ) : (
-            <Value>{data.watch_name}</Value>
-          )}
+          {editable ? <Text value={fields.watch} onChange={(v) => patch({ watch: v })} onBlur={() => save()} placeholder="Model" /> : <Value>{data.watch}</Value>}
         </Row>
         <Row label="Serial">
           {editable ? <Text value={fields.serial ?? ""} onChange={(v) => patch({ serial: v })} onBlur={() => save()} placeholder="Optional" mono /> : <Value mono muted={!data.serial}>{data.serial ?? "—"}</Value>}

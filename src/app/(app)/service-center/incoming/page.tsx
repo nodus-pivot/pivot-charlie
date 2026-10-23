@@ -30,7 +30,7 @@ export default async function IncomingPage({ searchParams }: PageProps<"/service
 
   let queue;
   try {
-    queue = await listIncoming(ws.current.id, brand.id, { force: sp.refresh === "1" });
+    queue = await listIncoming(ws.current.id, { force: sp.refresh === "1" });
   } catch (e) {
     return (
       <section className="px-12 py-9">
@@ -48,7 +48,6 @@ export default async function IncomingPage({ searchParams }: PageProps<"/service
       <ServiceCenterTabs active="incoming" counts={{ bench: totals.open, incoming: queue.rows.length, closed: totals.closed }} />
       <IncomingView
       rows={queue.rows}
-      catalog={queue.catalog}
       brandId={brand.id}
       brandName={brand.name}
       syncedAt={queue.syncedAt.toISOString()}

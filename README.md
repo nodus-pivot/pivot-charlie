@@ -10,9 +10,12 @@ current month tab and creates the ticket here.
 2. `.env.local` holds the Supabase URL and keys, the Google service-account key (base64 JSON) and
    the sheet ID. Ask an owner for a copy; it is never committed.
 3. `npx supabase link --project-ref vmzypgrryjspytnxhipm` once, then:
-   - `npm run db:push` applies migrations in `supabase/migrations`.
+   - `npm run db:push` applies migrations in `supabase/migrations` (one baseline file; see
+     `docs/SCHEMA-V2.md`). While pre-launch, schema changes edit the baseline and then
+     `npx supabase db reset --linked` rebuilds the database and runs the seed.
    - `npm run db:seed` regenerates `supabase/seed.sql` from `supabase/seed.py` and applies it.
      Re-run any time to reset the demo tickets and demo people; tickets created in the app are kept.
+     Then `node --env-file=.env.local scripts/seed-photos.mjs` uploads the two demo photos.
    - `npm run db:types` regenerates `src/lib/supabase/database.types.ts`. Run it after every
      migration and commit the result.
 4. `npm run dev`.

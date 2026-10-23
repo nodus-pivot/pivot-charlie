@@ -1,10 +1,9 @@
-import { STAGES, STAGE_LABELS, canActOn, type Grant, type Stage } from "@/features/pipeline";
+import { STAGES, STAGE_LABELS, TEST_LABELS, canActOn, type Grant, type Stage, type TestKind } from "@/features/pipeline";
 import { daysBetween, formatDate } from "@/lib/format";
 
 /**
- * My bench (S1), the pure part: takes board rows plus the per-ticket detail
- * the next-action labels need, and returns stats, filter counts and groups.
- * No React, no Supabase.
+ * My bench (D0), the pure part: takes board rows and returns stats, filter
+ * counts and groups. No React, no Supabase.
  */
 
 export type BenchRow = {
@@ -14,38 +13,42 @@ export type BenchRow = {
   workspace_id: string;
   brand_id: string;
   customer_name: string;
-  watch_name: string;
+  watch: string;
   priority: boolean;
   needs_payment: boolean;
+  payment_amount: number | null;
+  invoice_sent_at: string | null;
   payment_received: boolean;
   return_to_everett: boolean;
+  coverage: "warranty" | "paid" | null;
   stage_entered_at: string;
   closed_at: string | null;
+  /** Inspect answered No: cannot replicate. */
   parked: boolean;
-  waiting_on: string | null;
+  /** Supply answered No and the parts request is out. */
+  waiting_for_parts: boolean;
   parts_requested_at: string | null;
-  findings_total: number;
-  findings_done: number;
-  parts_total: number;
-  parts_in_hand: number;
+  parts_list: string | null;
+  awaiting_payment: boolean;
   tests_passed: number;
   ship_ready: boolean;
+  outcome: string | null;
+  slack_replies: number | null;
   bench_photo_path: string | null;
-  /** Components not yet marked done, in chip order. Empty outside Fix. */
-  undone: string[];
   /** Test kinds without a pass in the current attempt. Empty outside Test. */
-  tests_left: string[];
+  tests_left: TestKind[];
 };
 
 export const ATTENTION_DAYS = 14;
 export const AGE_BAR_MAX_DAYS = 30;
 
-export type BenchFilter = "all" | "needs_me" | "waiting" | "priority" | "over_14";
+export type BenchFilter = "all" | "needs_me" | "parked" | "priority" | "payment" | "over_14";
 export const BENCH_FILTERS: { key: BenchFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "needs_me", label: "Needs me" },
-  { key: "waiting", label: "Waiting on parts" },
+  { key: "parked", label: "Parked" },
   { key: "priority", label: "Priority" },
+  { key: "payment", label: "Payment" },
   { key: "over_14", label: "Over 14 days" },
 ];
 
@@ -55,20 +58,24 @@ export type NextAction = { label: string; emphasis?: boolean };
 
 export type BenchTicket = BenchRow & {
   days: number;
+  /** Either kind of parked: cannot replicate, or waiting on parts. */
+  isParked: boolean;
   needsMe: boolean;
   attention: boolean;
   next: NextAction;
-  /** "1 of 3", "2 of 3" — the progress fragment after the ticket number. */
+  /** "3 of 3" on Test; the progress fragment after the step name. */
   progress: string | null;
+  /** The row's amber / coral / gold tag line, if any. */
+  tag: { text: string; tone: "amber" | "coral" | "gold" } | null;
 };
 
 export type BenchGroup = { key: string; label: string; count: number; note?: string; tickets: BenchTicket[] };
 
 export type BenchStats = {
   needsYou: { count: number; note: string };
-  waiting: { count: number; note: string };
+  parked: { count: number; note: string };
   over14: { count: number; note: string };
-  readyToShip: { count: number; note: string };
+  awaitingPayment: { count: number; note: string };
 };
 
 export type Bench = {
@@ -82,39 +89,37 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/** The part word for "Mark dial arrived": the catalog name before its comma, lowercased. */
-export function waitingWord(waitingOn: string | null): string {
-  if (!waitingOn) return "part";
-  return waitingOn.split(",")[0].trim().toLowerCase();
-}
-
+/** The single next action on the row's right, per the handoff's D0. */
 export function nextAction(t: BenchRow): NextAction {
   switch (t.stage) {
     case "check_in":
-      return { label: "Confirm check in" };
+      return { label: "I have the watch" };
     case "inspect":
-      return { label: "Finish inspection" };
+      return t.parked ? { label: "Open ticket" } : { label: "Inspect" };
     case "supply":
-      if (t.parked) return { label: `Mark ${waitingWord(t.waiting_on)} arrived` };
-      return { label: t.parts_total === 0 ? "Continue to Fix" : "Sort parts" };
-    case "fix":
-      return { label: t.undone[0] ? `Mark ${cap(t.undone[0])} done` : "Fix done" };
+      return t.waiting_for_parts ? { label: "Parts received?" } : { label: "Sort parts" };
+    case "repair":
+      return { label: "Mark repaired" };
     case "test":
-      return { label: t.tests_left[0] ? `Run ${cap(t.tests_left[0])} check` : "Tests passed" };
+      return t.tests_left[0] ? { label: `Run ${TEST_LABELS[t.tests_left[0]].split(" ")[0]} check` } : { label: "Tests passed", emphasis: true };
+    case "payment":
+      return { label: "Payment received" };
     case "ship":
-      return t.ship_ready ? { label: "Close ticket", emphasis: true } : { label: "Print label", emphasis: true };
+      return t.ship_ready ? { label: "Shipped", emphasis: true } : { label: "Generate label", emphasis: true };
     case "closed":
-      return { label: "Open" };
+      return { label: "Summary" };
   }
 }
 
 export function progressLabel(t: BenchRow): string | null {
-  if (t.stage === "fix" && t.findings_total > 0) return `${t.findings_done} of ${t.findings_total}`;
   if (t.stage === "test") return `${t.tests_passed} of 3`;
+  return null;
+}
+
+export function rowTag(t: BenchRow, now: Date): BenchTicket["tag"] {
+  if (t.waiting_for_parts) return { text: `Waiting on parts · asked ${formatDate(t.parts_requested_at, now)}`, tone: "amber" };
+  if (t.parked) return { text: `Cannot replicate${t.slack_replies ? ` · Slack ${t.slack_replies} repl${t.slack_replies === 1 ? "y" : "ies"}` : ""}`, tone: "coral" };
+  if (t.awaiting_payment) return { text: [t.payment_amount != null ? `$${t.payment_amount.toFixed(0)}` : null, t.invoice_sent_at ? `invoice sent ${formatDate(t.invoice_sent_at, now)}` : "invoice not sent"].filter(Boolean).join(" · "), tone: "gold" };
   return null;
 }
 
@@ -122,13 +127,16 @@ export function decorate(rows: BenchRow[], grants: Grant[], now: Date): BenchTic
   return rows.map((t) => {
     const days = daysBetween(t.stage_entered_at, now);
     const own = canActOn(grants, t.stage, t.workspace_id, t.brand_id);
+    const isParked = t.parked || t.waiting_for_parts;
     return {
       ...t,
       days,
-      needsMe: own && !t.parked && t.stage !== "closed",
-      attention: t.stage !== "closed" && days > ATTENTION_DAYS,
+      isParked,
+      needsMe: own && !isParked && t.stage !== "closed",
+      attention: t.stage !== "closed" && !isParked && days > ATTENTION_DAYS,
       next: nextAction(t),
       progress: progressLabel(t),
+      tag: rowTag(t, now),
     };
   });
 }
@@ -139,10 +147,12 @@ function matches(t: BenchTicket, filter: BenchFilter): boolean {
       return true;
     case "needs_me":
       return t.needsMe;
-    case "waiting":
-      return t.parked;
+    case "parked":
+      return t.isParked;
     case "priority":
       return t.priority;
+    case "payment":
+      return t.stage === "payment" || (t.needs_payment && !t.payment_received && t.stage !== "closed");
     case "over_14":
       return t.attention;
   }
@@ -150,7 +160,7 @@ function matches(t: BenchTicket, filter: BenchFilter): boolean {
 
 function matchesQuery(t: BenchTicket, q: string): boolean {
   if (!q) return true;
-  const hay = `${t.customer_name} ${t.watch_name} ${t.number}`.toLowerCase();
+  const hay = `${t.customer_name} ${t.watch} ${t.number}`.toLowerCase();
   return q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
 }
 
@@ -162,23 +172,23 @@ export function buildBench(
   const now = opts.now ?? new Date();
   const all = decorate(rows, grants, now);
 
-  const waiting = all.filter((t) => t.parked);
+  const parked = all.filter((t) => t.isParked);
   const over = all.filter((t) => t.attention);
-  const ready = all.filter((t) => t.stage === "ship");
+  const payment = all.filter((t) => t.awaiting_payment);
   const needs = all.filter((t) => t.needsMe);
+  const waitingN = parked.filter((t) => t.waiting_for_parts).length;
+  const cannotN = parked.filter((t) => t.parked).length;
 
   const stats: BenchStats = {
     needsYou: { count: needs.length, note: needs.length === 1 ? "step waiting on your action" : "steps waiting on your action" },
-    waiting: {
-      count: waiting.length,
-      note: waiting[0]
-        ? `${firstName(waiting[0].customer_name)} · ${waitingWord(waiting[0].waiting_on)} requested ${formatDate(waiting[0].parts_requested_at, now)}`
-        : "nothing parked",
+    parked: {
+      count: parked.length,
+      note: parked.length ? [waitingN ? `${waitingN} waiting on parts` : null, cannotN ? `${cannotN} cannot replicate` : null].filter(Boolean).join(" · ") : "nothing parked",
     },
     over14: { count: over.length, note: over.length ? over.map((t) => firstName(t.customer_name)).join(" · ") : "everything is moving" },
-    readyToShip: {
-      count: ready.length,
-      note: ready[0] ? `${ready[0].customer_name} · ${ready[0].ship_ready ? "ready to close" : "label not printed"}` : "nothing at Ship",
+    awaitingPayment: {
+      count: payment.length,
+      note: payment[0] ? `${firstName(payment[0].customer_name)} · ${payment[0].invoice_sent_at ? `invoice sent ${formatDate(payment[0].invoice_sent_at, now)}` : "invoice not sent"}` : "nothing owed",
     },
   };
 
@@ -190,14 +200,57 @@ export function buildBench(
     .sort((a, b) => (b.days - a.days) * dir || a.number.localeCompare(b.number));
 
   const groups: BenchGroup[] = [];
+  const parkedShown = shown.filter((t) => t.isParked);
+  if (parkedShown.length) groups.push({ key: "parked", label: "Parked", count: parkedShown.length, tickets: parkedShown });
   const attention = shown.filter((t) => t.attention);
   if (attention.length) {
     groups.push({ key: "attention", label: "Needs attention", count: attention.length, note: `over ${ATTENTION_DAYS} days in step`, tickets: attention });
   }
   for (const stage of STAGES) {
-    const tickets = shown.filter((t) => t.stage === stage && !t.attention);
+    const tickets = shown.filter((t) => t.stage === stage && !t.attention && !t.isParked);
     if (tickets.length) groups.push({ key: stage, label: STAGE_LABELS[stage], count: tickets.length, tickets });
   }
 
   return { stats, counts, groups, total: all.length };
+}
+
+/** Closed list (D13): grouped by the month the ticket closed, newest first. */
+export type ClosedFilter = "all" | "warranty" | "paid" | "nothing_wrong";
+export const CLOSED_FILTERS: { key: ClosedFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "warranty", label: "Warranty" },
+  { key: "paid", label: "Paid" },
+  { key: "nothing_wrong", label: "Nothing wrong" },
+];
+
+const monthFmt = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/Los_Angeles" });
+
+export function closedMatches(t: BenchRow, filter: ClosedFilter): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "warranty":
+      return !t.needs_payment;
+    case "paid":
+      return t.needs_payment;
+    case "nothing_wrong":
+      return t.outcome === "nothing wrong";
+  }
+}
+
+export function buildClosed(rows: BenchRow[], grants: Grant[], opts: { filter: ClosedFilter; query: string; now?: Date }): { groups: BenchGroup[]; counts: Record<ClosedFilter, number>; total: number } {
+  const now = opts.now ?? new Date();
+  const all = decorate(rows, grants, now);
+  const counts = Object.fromEntries(CLOSED_FILTERS.map((f) => [f.key, all.filter((t) => closedMatches(t, f.key)).length])) as Record<ClosedFilter, number>;
+  const shown = all.filter((t) => closedMatches(t, opts.filter) && matchesQuery(t, opts.query)).sort((a, b) => (b.closed_at ?? "").localeCompare(a.closed_at ?? ""));
+  const groups: BenchGroup[] = [];
+  for (const t of shown) {
+    const label = t.closed_at ? monthFmt.format(new Date(t.closed_at)) : "Undated";
+    const g = groups.find((x) => x.key === label);
+    if (g) {
+      g.tickets.push(t);
+      g.count++;
+    } else groups.push({ key: label, label, count: 1, tickets: [t] });
+  }
+  return { groups, counts, total: all.length };
 }

@@ -7,12 +7,11 @@ import { AddPhotoSlot } from "@/components/ui/photo";
 import { uploadPhoto } from "@/lib/photos-client";
 import { addTicketPhoto } from "@/features/tickets/actions";
 import { Button } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
 import { Segmented, ToggleChip } from "@/components/ui/segmented";
 import { CountrySelect } from "@/components/ui/country-select";
 import { cn } from "@/lib/utils";
 import { createTicket } from "../actions";
-import type { CatalogWatch, IncomingRow } from "../sheet";
+import type { IncomingRow } from "../sheet";
 
 /**
  * The ticket fields, shared by Incoming (prefilled from a sheet row, with
@@ -31,7 +30,7 @@ export type Draft = {
   state: string;
   postal_code: string;
   country: string;
-  watchId: string;
+  watch: string;
   serial: string;
   coverage: "warranty" | "paid" | null;
   priority: boolean;
@@ -53,7 +52,7 @@ export const EMPTY_DRAFT: Draft = {
   state: "",
   postal_code: "",
   country: "US",
-  watchId: "",
+  watch: "",
   serial: "",
   coverage: "warranty",
   priority: false,
@@ -76,7 +75,7 @@ export function draftFromRow(r: IncomingRow): Draft {
     state: r.address.state,
     postal_code: r.address.postal_code,
     country: r.address.country || "US",
-    watchId: r.model.kind === "none" ? "" : r.model.watch.id,
+    watch: r.fields.model.trim(),
     serial: r.fields.serial,
     coverage: r.needsPayment ? "paid" : "warranty",
     priority: /priority/i.test(r.issue),
@@ -91,7 +90,7 @@ export function missingFor(d: Draft): string[] {
   const m: string[] = [];
   if (!d.customerName.trim()) m.push("name");
   if (!/\S+@\S+\.\S+/.test(d.customerEmail)) m.push("email");
-  if (!d.watchId) m.push("watch");
+  if (!d.watch.trim()) m.push("watch");
   if (!d.issue.trim()) m.push("what they said");
   return m;
 }
@@ -101,12 +100,11 @@ export type FormContext = { kind: "sheet"; row: IncomingRow; monthTab: string } 
 type Props = {
   draft: Draft;
   onPatch: (p: Partial<Draft>) => void;
-  catalog: CatalogWatch[];
   brandId: string;
   context: FormContext;
 };
 
-export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props) {
+export function TicketForm({ draft, onPatch, brandId, context }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -119,7 +117,6 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
       return ps.filter((_, j) => j !== i);
     });
   }
-  const watch = catalog.find((w) => w.id === draft.watchId) ?? null;
   const missing = missingFor(draft);
   const src = (s: string) => (sheet ? s : undefined);
 
@@ -130,12 +127,11 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
       try {
         r = await createTicket({
           brandId,
-          watchId: draft.watchId,
+          watch: draft.watch,
           customerName: draft.customerName,
           customerEmail: draft.customerEmail,
           customerPhone: draft.customerPhone,
           shipTo: { line1: draft.line1, line2: draft.line2, city: draft.city, state: draft.state, postal_code: draft.postal_code, country: draft.country },
-          modelText: sheet?.fields.model ?? null,
           serial: draft.serial,
           issue: draft.issue,
           benchNote: draft.benchNote,
@@ -200,34 +196,8 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
           </FieldRow>
         </div>
         <div>
-          <FieldRow
-            label="Watch"
-            source={src("Model")}
-            trailing={
-              sheet ? (
-                sheet.model.kind === "none" ? <Chip tone="amber">Not in catalog</Chip> : sheet.model.kind === "fuzzy" ? <Chip tone="amber">Best guess</Chip> : <Chip tone="green">In catalog</Chip>
-              ) : null
-            }
-          >
-            <span className="flex flex-wrap items-center gap-2.5 text-[17px] text-ink">
-              {sheet ? (
-                <>
-                  <span className="truncate">{sheet.fields.model || "—"}</span>
-                  <ArrowRight size={14} className="text-ink-3" aria-hidden />
-                </>
-              ) : null}
-              <select
-                value={draft.watchId}
-                onChange={(e) => onPatch({ watchId: e.target.value })}
-                className={cn("bg-transparent text-[17px] outline-none [&>option]:bg-panel", draft.watchId ? "text-ink" : "text-gold-light")}
-                aria-label="Catalog model"
-              >
-                <option value="">Pick a model ▾</option>
-                {catalog.map((w) => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
-            </span>
+          <FieldRow label="Watch" source={src("Model")}>
+            <TextInput value={draft.watch} onChange={(v) => onPatch({ watch: v })} placeholder={sheet ? "Missing on the form" : "Model, as the customer calls it"} />
           </FieldRow>
           <FieldRow label="Serial" source={src("Serial Number")}>
             <TextInput value={draft.serial} onChange={(v) => onPatch({ serial: v })} placeholder="Optional" mono />
@@ -244,7 +214,7 @@ export function TicketForm({ draft, onPatch, catalog, brandId, context }: Props)
             }
           >
             <span className="text-[17px] text-ink">
-              {draft.coverage === "paid" ? "Paid repair" : watch ? `Warranty${watch.warranty_months ? ` · ${watch.warranty_months} mo` : ""}` : <span className="text-ink-3">Set by the model</span>}
+              {draft.coverage === "paid" ? "Paid repair · adds the Payment step" : "Warranty"}
             </span>
             {sheet ? (
               <span className="text-xs text-ink-3">

@@ -1,164 +1,156 @@
-import { COMPONENT_LABELS, STAGES, STAGE_LABELS, stageIndex, type Component, type Stage } from "@/features/pipeline";
-import { formatDate, formatMinutes } from "@/lib/format";
+import { STAGE_LABELS, STEPS, TEST_LABELS, stageIndex, type Stage, type Step, type TestKind } from "@/features/pipeline";
+import { formatDate } from "@/lib/format";
 
 /**
- * The step rail's one-line summaries for completed steps ("Aug 17 · Bezel ·
- * Case · Gaskets"), computed from the ticket's own tables. Pure; the page
- * passes plain data in.
+ * The step rail's one-line summaries for completed steps ("Oct 16 · Issue
+ * present · Crown tube stripped…"), computed from the ticket's step rows.
+ * Pure; the page passes plain data in.
  */
 
 export type StepState = "done" | "current" | "future";
 
-export type StepRow = { stage: Stage; label: string; state: StepState; date: string | null; summary: string | null };
+export type StepRecord = {
+  stage: Step;
+  answer: boolean | null;
+  notes: string | null;
+  done_at: string | null;
+  done_by_name: string | null;
+  skipped: boolean;
+};
+
+export type StepRow = { stage: Step; label: string; state: StepState; date: string | null; summary: string | null; skipped: boolean };
 
 export type SummaryInput = {
   stage: Stage;
-  bench_minutes: number | null;
+  needs_payment: boolean;
+  payment_amount: number | null;
   closed_at: string | null;
-  received_at: string | null;
-  events: { type: string; from_stage: Stage | null; to_stage: Stage | null; created_at: string; actor_name: string | null }[];
-  findings: { component: Component; action: "fix" | "replace"; condition: string | null; part: { name: string; sku: string } | null; done_at: string | null }[];
-  parts: { have_it: boolean; arrived_at: string | null; requested_at: string | null; label: string | null; part: { name: string; component?: string } }[];
+  ship_carrier: string | null;
+  ship_tracking: string | null;
+  steps: StepRecord[];
   tests: { attempt: number; kind: string; result: string }[];
   test_attempt: number;
-  shipment: { carrier: string | null; tracking: string | null; handed_over: boolean; shipped_at: string | null } | null;
+  messages: { channel: "slack" | "email"; kind: string; created_at: string; reply_count: number }[];
 };
 
-/** When the ticket left a stage: the latest forward move out of it. */
-export function completedAt(events: SummaryInput["events"], stage: Stage): string | null {
-  const e = events.filter((x) => x.type === "stage_changed" && x.from_stage === stage).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  return e?.created_at ?? null;
+export function stepOf(t: { steps: StepRecord[] }, stage: Step): StepRecord | undefined {
+  return t.steps.find((s) => s.stage === stage);
 }
 
-/** When the ticket entered a stage: the latest move into it (or creation for check_in). */
-export function enteredAt(events: SummaryInput["events"], stage: Stage): string | null {
-  const e = events
-    .filter((x) => x.to_stage === stage && ["stage_changed", "sent_back", "reopened", "created"].includes(x.type))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  return e?.created_at ?? null;
+function firstLine(text: string | null | undefined, max = 60): string | null {
+  const line = text?.split("\n").map((l) => l.trim()).find(Boolean);
+  if (!line) return null;
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 }
 
-function labels(components: Component[]): string {
-  return components.map((c) => COMPONENT_LABELS[c]).join(" · ");
+/** "1× Dial, 1× Crown" → "dial, crown": the parts list as a short phrase. */
+export function partsPhrase(list: string | null | undefined): string | null {
+  const items = (list ?? "")
+    .split("\n")
+    .map((l) => l.replace(/^\s*\d+\s*[x×]\s*/i, "").split(",")[0].trim().toLowerCase())
+    .filter(Boolean);
+  return items.length ? items.join(", ") : null;
 }
 
-export function stepSummary(t: SummaryInput, stage: Stage, now: Date): string | null {
+export function stepSummary(t: SummaryInput, stage: Step): string | null {
+  const s = stepOf(t, stage);
+  if (!s) return null;
+  if (s.skipped) return stage === "payment" ? "Not required · warranty" : "skipped · nothing wrong";
   switch (stage) {
-    case "check_in": {
-      const e = t.events.find((x) => x.type === "stage_changed" && x.from_stage === "check_in");
-      return e?.actor_name ?? null;
-    }
+    case "check_in":
+      return s.done_by_name;
     case "inspect":
-      return t.findings.length ? labels(t.findings.map((f) => f.component)) : "nothing to fix";
-    case "supply": {
-      if (!t.parts.length) return "no parts needed";
-      const arrived = t.parts.map((p) => p.arrived_at).filter((x): x is string => !!x).sort().at(-1);
-      return `${t.parts.length} part${t.parts.length === 1 ? "" : "s"} · ${arrived ? `in hand ${formatDate(arrived, now)}` : "all in hand"}`;
-    }
-    case "fix": {
-      const done = labels(t.findings.filter((f) => f.done_at).map((f) => f.component));
-      return [done || null, t.bench_minutes ? formatMinutes(t.bench_minutes) : null].filter(Boolean).join(" · ") || null;
-    }
+      return [s.answer === false ? "Nothing wrong" : s.answer ? "Issue present" : null, firstLine(s.notes)].filter(Boolean).join(" · ") || null;
+    case "supply":
+      return s.answer ? "had parts" : s.answer === false ? ["Parts received", partsPhrase(s.notes)].filter(Boolean).join(" · ") : null;
+    case "repair":
+      return firstLine(s.notes) ?? "Repaired";
     case "test": {
-      const passed = t.tests.filter((x) => x.attempt === t.test_attempt && x.result === "pass").map((x) => x.kind);
-      const order = ["time", "water", "looks"];
-      const names = order.filter((k) => passed.includes(k)).map((k) => k[0].toUpperCase() + k.slice(1));
-      return names.length ? `${names.join(" · ")}${names.length === 3 ? " · all passed" : ""}` : null;
+      const attempts = Math.max(1, ...t.tests.map((x) => x.attempt));
+      return attempts > 1 ? `all pass · attempt ${attempts}` : "all pass";
     }
-    case "ship": {
-      if (!t.shipment) return null;
-      if (t.shipment.handed_over) return "handed over in person";
-      return [t.shipment.carrier?.toUpperCase(), t.shipment.tracking].filter(Boolean).join(" ") || null;
-    }
-    case "closed":
-      return null;
+    case "payment":
+      return t.payment_amount != null ? `$${t.payment_amount.toFixed(0)} · paid` : "paid";
+    case "ship":
+      return [t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || "shipped";
   }
 }
 
 export function stepRows(t: SummaryInput, now: Date = new Date()): StepRow[] {
   const current = stageIndex(t.stage);
-  return STAGES.filter((s) => s !== "closed").map((stage) => {
+  return STEPS.map((stage) => {
+    const s = stepOf(t, stage);
     const ix = stageIndex(stage);
+    // The open step stays open even once its row is done (Supply's "Parts received" ticks done_at before advancing).
     const state: StepState = t.stage === "closed" || ix < current ? "done" : ix === current ? "current" : "future";
-    const when = state === "done" ? completedAt(t.events, stage) : enteredAt(t.events, stage);
     return {
       stage,
       label: STAGE_LABELS[stage],
       state,
-      date: when ? formatDate(when, now) : null,
-      summary: state === "done" ? stepSummary(t, stage, now) : null,
+      date: state === "done" && s?.done_at && !s.skipped ? formatDate(s.done_at, now) : null,
+      summary: state === "done" ? stepSummary(t, stage) : null,
+      skipped: !!s?.skipped,
     };
   });
 }
 
-/** The band's trailing line: "Contrail GMT · NW260004 · in Check in · priority". */
-export function statusWord(t: { stage: Stage; closed_at: string | null; parked: boolean }, now: Date = new Date()): { text: string; tone: "gold" | "amber" | "green" } {
+export type Parked = { kind: "cannot_replicate" | "waiting_for_parts"; since: string | null; replies: number };
+
+/** Parked state from the step rows: cannot replicate on Inspect, waiting on parts on Supply. */
+export function parkedState(t: SummaryInput): Parked | null {
+  if (t.stage === "inspect" && stepOf(t, "inspect")?.answer === false) {
+    const post = [...t.messages].reverse().find((m) => m.channel === "slack" && m.kind === "cannot_replicate");
+    return { kind: "cannot_replicate", since: post?.created_at ?? null, replies: post?.reply_count ?? 0 };
+  }
+  if (t.stage === "supply") {
+    const s = stepOf(t, "supply");
+    const post = [...t.messages].reverse().find((m) => m.channel === "slack" && m.kind === "parts_needed");
+    if (s?.answer === false && !s.done_at && post) return { kind: "waiting_for_parts", since: post.created_at, replies: post.reply_count };
+  }
+  return null;
+}
+
+/** The band's trailing line: "Sector GMT · NW260003 · in Supply · waiting for parts". */
+export function statusWord(t: { stage: Stage; closed_at: string | null; parked: Parked | null; awaiting_payment: boolean }, now: Date = new Date()): { text: string; tone: "gold" | "amber" | "green" | "coral" } {
   if (t.stage === "closed") return { text: `closed ${formatDate(t.closed_at, now)}`, tone: "green" };
-  if (t.parked) return { text: "waiting for parts", tone: "amber" };
+  if (t.parked?.kind === "cannot_replicate") return { text: "parked · cannot replicate", tone: "coral" };
+  if (t.parked?.kind === "waiting_for_parts") return { text: "waiting for parts", tone: "amber" };
+  if (t.awaiting_payment) return { text: "awaiting payment", tone: "amber" };
   return { text: `in ${STAGE_LABELS[t.stage]}`, tone: "gold" };
 }
 
-/** S10: the repair as a record, one dated line per step. */
+/** D10: the repair as a record, one line per step. */
 export type ClosedRow = { label: string; text: string };
 
-const CONDITION_LABEL: Record<string, string> = { worn: "Worn", scratched: "Scratched", discolored: "Discolored", cracked: "Cracked" };
-const EMAIL_LABEL: Record<string, string> = { request_received: "Request received", repair_in_progress: "Repair in progress", testing: "Testing", on_its_way: "On its way back" };
-
 export function closedRows(
-  t: SummaryInput & { source: "sheet" | "by_hand"; coverage: "warranty" | "paid" | null; emails: string[] },
+  t: SummaryInput & { issue: string | null; source: "sheet" | "by_hand"; coverage: "warranty" | "paid" | null; check_in_by: string | null },
   now: Date = new Date(),
 ): ClosedRow[] {
-  const d = (iso: string | null) => (iso ? formatDate(iso, now) : null);
-  const checkIn = t.events.find((e) => e.type === "stage_changed" && e.from_stage === "check_in");
+  const d = (iso: string | null | undefined) => (iso ? formatDate(iso, now) : null);
+  const s = (stage: Step) => stepOf(t, stage);
   const rows: ClosedRow[] = [];
 
-  rows.push({
-    label: "Checked in",
-    text: [d(checkIn?.created_at ?? null), checkIn?.actor_name, t.source === "sheet" ? "from the website" : "by hand"].filter(Boolean).join(" · "),
-  });
-
-  rows.push({
-    label: "Inspected",
-    text: [
-      d(completedAt(t.events, "inspect")),
-      ...t.findings.map((f) => [COMPONENT_LABELS[f.component], f.condition ? CONDITION_LABEL[f.condition] : null, f.action === "replace" ? "Replace" : "Fix"].filter(Boolean).join(" · ")),
-    ].filter(Boolean).join(" · ") || "nothing to fix",
-  });
-
-  const supplyBits = t.parts.map((p) => {
-    const name = p.label ? p.label.toLowerCase() : p.part.component && p.part.component in COMPONENT_LABELS ? COMPONENT_LABELS[p.part.component as Component].toLowerCase() : p.part.name.toLowerCase();
-    if (p.have_it) return `had the ${name} in hand`;
-    if (p.requested_at) return `${name} requested ${d(p.requested_at)}${p.arrived_at ? `, arrived ${d(p.arrived_at)}` : ""}`;
-    return `${name} in hand`;
-  });
-  rows.push({ label: "Supply", text: [d(completedAt(t.events, "supply")), ...(supplyBits.length ? supplyBits : ["no parts needed"])].filter(Boolean).join(" · ") });
-
-  const fixBits = t.findings.map((f) =>
-    f.action === "replace" ? `Replace — ${f.part ? `${f.part.name} ${f.part.sku}` : COMPONENT_LABELS[f.component]}` : `${COMPONENT_LABELS[f.component]} fixed`,
-  );
-  rows.push({
-    label: "Fixed",
-    text: [d(completedAt(t.events, "fix")), ...fixBits, t.bench_minutes ? formatMinutes(t.bench_minutes) : null, t.coverage].filter(Boolean).join(" · "),
-  });
-
+  rows.push({ label: "Reported", text: [t.issue, t.source === "sheet" ? "from the website" : "by hand"].filter(Boolean).join(" · ") });
+  rows.push({ label: "Checked in", text: [d(s("check_in")?.done_at), t.check_in_by].filter(Boolean).join(" · ") || "—" });
+  const ins = s("inspect");
+  rows.push({ label: "Found", text: [d(ins?.done_at), ins?.answer === false ? "Nothing wrong" : ins?.answer ? "Issue present" : null, ins?.notes].filter(Boolean).join(" · ") || "—" });
+  const sup = s("supply");
+  rows.push({ label: "Parts", text: sup?.skipped ? "none · nothing wrong" : sup?.answer ? "had parts in hand" : sup?.answer === false ? [partsPhrase(sup.notes) ?? "parts requested", sup.done_at ? `received ${d(sup.done_at)}` : null].filter(Boolean).join(" · ") : "—" });
+  const rep = s("repair");
+  rows.push({ label: "Repaired", text: rep?.skipped ? "nothing to repair" : [d(rep?.done_at), rep?.notes, t.coverage].filter(Boolean).join(" · ") || "—" });
   const attempts = Math.max(1, ...t.tests.map((x) => x.attempt));
-  rows.push({
-    label: "Tested",
-    text: [d(completedAt(t.events, "test")), "Time · Water · Looks all passed", attempts > 1 ? `on attempt ${attempts}` : null].filter(Boolean).join(" · "),
-  });
-
-  rows.push({
-    label: "Shipped",
-    text: t.shipment
-      ? [
-          d(t.shipment.shipped_at ?? completedAt(t.events, "ship")),
-          t.shipment.handed_over ? "handed over in person" : [t.shipment.carrier?.toUpperCase(), t.shipment.tracking].filter(Boolean).join(" "),
-          t.shipment.handed_over ? null : (t.shipment as { signature_required?: boolean }).signature_required ? "signature required" : "signature not required",
-        ].filter(Boolean).join(" · ")
-      : "—",
-  });
-
-  const sent = t.emails.map((k) => EMAIL_LABEL[k] ?? k);
-  rows.push({ label: "Emails", text: sent.length ? sent.join(" · ") : "none logged" });
+  const tst = s("test");
+  rows.push({ label: "Tested", text: tst?.skipped ? "skipped" : [d(tst?.done_at), `${Object.values(TEST_LABELS).join(" · ")} all passed`, attempts > 1 ? `on attempt ${attempts}` : null].filter(Boolean).join(" · ") });
+  const pay = s("payment");
+  rows.push({ label: "Payment", text: pay?.skipped || !t.needs_payment ? "Not required · warranty" : [t.payment_amount != null ? `$${t.payment_amount.toFixed(2)}` : null, pay?.answer ? `paid ${d(pay.done_at) ?? ""}`.trim() : "not paid · shipped on override"].filter(Boolean).join(" · ") });
+  const shipped = s("ship");
+  const emailed = t.messages.some((m) => m.channel === "email" && m.kind === "shipped");
+  rows.push({ label: "Shipped", text: [d(shipped?.done_at), [t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || null, emailed ? "email logged" : null].filter(Boolean).join(" · ") || "—" });
   return rows;
+}
+
+/** Test kinds without a pass in the current attempt, in order. */
+export function testsLeft(tests: { attempt: number; kind: string; result: string }[], attempt: number): TestKind[] {
+  const passed = new Set(tests.filter((x) => x.attempt === attempt && x.result === "pass").map((x) => x.kind));
+  return (["time", "water", "looks"] as TestKind[]).filter((k) => !passed.has(k));
 }

@@ -1,14 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { COMPONENTS, type Stage } from "@/features/pipeline";
+import { TEST_KINDS, type Stage, type TestKind } from "@/features/pipeline";
 import type { BenchRow } from "./bench";
-
-const TEST_KINDS = ["time", "water", "looks"] as const;
 
 /**
  * Every open (or closed) ticket in the workspace from the board view, plus
- * the two per-ticket details the next-action labels need: components not
- * yet done on Fix, tests not yet passed on Test. RLS trims the rows.
+ * which checks are still to run on tickets at Test. RLS trims the rows.
  */
 export async function listBench(workspaceId: string, view: "open" | "closed"): Promise<BenchRow[]> {
   const supabase = await createClient();
@@ -18,27 +15,13 @@ export async function listBench(workspaceId: string, view: "open" | "closed"): P
   if (error) throw error;
   const rows = data ?? [];
 
-  const fixIds = rows.filter((r) => r.stage === "fix").map((r) => r.id!);
   const testIds = rows.filter((r) => r.stage === "test").map((r) => r.id!);
-  const [findings, tests, attempts] = await Promise.all([
-    fixIds.length
-      ? supabase.from("ticket_findings").select("ticket_id, component").in("ticket_id", fixIds).is("done_at", null)
-      : Promise.resolve({ data: [] as { ticket_id: string; component: string }[] }),
-    testIds.length
-      ? supabase.from("ticket_tests").select("ticket_id, attempt, kind, result").in("ticket_id", testIds)
-      : Promise.resolve({ data: [] as { ticket_id: string; attempt: number; kind: string; result: string }[] }),
-    testIds.length
-      ? supabase.from("tickets").select("id, test_attempt").in("id", testIds)
-      : Promise.resolve({ data: [] as { id: string; test_attempt: number }[] }),
-  ]);
-
-  const undoneBy = new Map<string, string[]>();
-  for (const f of findings.data ?? []) {
-    undoneBy.set(f.ticket_id, [...(undoneBy.get(f.ticket_id) ?? []), f.component]);
-  }
-  const attemptBy = new Map((attempts.data ?? []).map((t) => [t.id, t.test_attempt]));
+  const { data: tests } = testIds.length
+    ? await supabase.from("ticket_tests").select("ticket_id, attempt, kind, result").in("ticket_id", testIds)
+    : { data: [] as { ticket_id: string; attempt: number; kind: string; result: string }[] };
+  const attemptBy = new Map(rows.map((r) => [r.id!, r.test_attempt ?? 1]));
   const passedBy = new Map<string, Set<string>>();
-  for (const t of tests.data ?? []) {
+  for (const t of tests ?? []) {
     if (t.result === "pass" && t.attempt === (attemptBy.get(t.ticket_id) ?? 1)) {
       passedBy.set(t.ticket_id, new Set([...(passedBy.get(t.ticket_id) ?? []), t.kind]));
     }
@@ -51,25 +34,27 @@ export async function listBench(workspaceId: string, view: "open" | "closed"): P
     workspace_id: r.workspace_id!,
     brand_id: r.brand_id!,
     customer_name: r.customer_name!,
-    watch_name: r.watch_name!,
+    watch: r.watch ?? "",
     priority: !!r.priority,
     needs_payment: !!r.needs_payment,
+    payment_amount: r.payment_amount,
+    invoice_sent_at: r.invoice_sent_at,
     payment_received: !!r.payment_received,
     return_to_everett: !!r.return_to_everett,
+    coverage: r.coverage,
     stage_entered_at: r.stage_entered_at!,
     closed_at: r.closed_at,
     parked: !!r.parked,
-    waiting_on: r.waiting_on,
+    waiting_for_parts: !!r.waiting_for_parts,
     parts_requested_at: r.parts_requested_at,
-    findings_total: r.findings_total ?? 0,
-    findings_done: r.findings_done ?? 0,
-    parts_total: r.parts_total ?? 0,
-    parts_in_hand: r.parts_in_hand ?? 0,
+    parts_list: r.parts_list,
+    awaiting_payment: !!r.awaiting_payment,
     tests_passed: r.tests_passed ?? 0,
     ship_ready: !!r.ship_ready,
+    outcome: r.outcome,
+    slack_replies: r.slack_replies,
     bench_photo_path: r.bench_photo_path,
-    undone: COMPONENTS.filter((c) => (undoneBy.get(r.id!) ?? []).includes(c)),
-    tests_left: TEST_KINDS.filter((k) => !(passedBy.get(r.id!) ?? new Set()).has(k)),
+    tests_left: r.stage === "test" ? (TEST_KINDS.filter((k) => !(passedBy.get(r.id!) ?? new Set()).has(k)) as TestKind[]) : [],
   }));
 }
 

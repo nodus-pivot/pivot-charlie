@@ -5,9 +5,9 @@ import { isAdminOf, isOwner, type Grant } from "@/features/pipeline";
  * the database enforces the same rules through RLS and the app.* helpers.
  */
 
-/** Ops as a module: owners, admins, and anyone with a brand grant (read-only pages for them). */
+/** Ops as a module: owners and admins. The catalog pages are gone, so brand-level roles have nothing to see there. */
 export function canOpenOps(grants: Grant[]): boolean {
-  return grants.length > 0;
+  return isAnyAdmin(grants);
 }
 
 /** Owners and admins of at least one workspace. */
@@ -29,23 +29,11 @@ export function isBenchOnly(grants: Grant[]): boolean {
   return grants.length > 0 && grants.every((g) => g.role === "watchmaker");
 }
 
-export type OpsPage = "watches" | "components" | "users" | "workspace";
+export type OpsPage = "users" | "workspace";
 
-/** Which Ops pages the person may open. Catalog pages are visible to everyone in scope; people and workspace are admin-only. */
+/** Which Ops pages the person may open: both are admin-only. */
 export function canOpenOpsPage(grants: Grant[], page: OpsPage, workspaceId: string): boolean {
-  const admin = isAdminOf(grants, workspaceId);
-  switch (page) {
-    case "watches":
-    case "components":
-      return admin || grants.some((g) => !!g.brand_id);
-    case "users":
-    case "workspace":
-      return admin;
-  }
-}
-
-/** Only owners and admins edit anything in Ops. */
-export function canEditOps(grants: Grant[], workspaceId: string): boolean {
+  void page;
   return isAdminOf(grants, workspaceId);
 }
 

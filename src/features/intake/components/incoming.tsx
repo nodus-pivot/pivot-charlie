@@ -9,12 +9,11 @@ import { Chip } from "@/components/ui/chip";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/utils";
 import { dismissRow, refreshIncoming, retryMoves, syncSheet } from "../actions";
-import type { CatalogWatch, IncomingRow } from "../sheet";
+import type { IncomingRow } from "../sheet";
 import { TicketForm, draftFromRow, type Draft } from "./ticket-form";
 
 type Props = {
   rows: IncomingRow[];
-  catalog: CatalogWatch[];
   brandId: string;
   brandName: string;
   syncedAt: string;
@@ -26,10 +25,10 @@ type Props = {
   initialSelected?: string;
 };
 
-type Filter = "all" | "missing" | "payment" | "model";
+type Filter = "all" | "missing" | "payment" | "nomodel";
 const timeFmt = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
 
-export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stale, pendingMoves, pendingWritebacks, failedWritebacks, monthTab, initialSelected }: Props) {
+export function IncomingView({ rows, brandId, brandName, syncedAt, stale, pendingMoves, pendingWritebacks, failedWritebacks, monthTab, initialSelected }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -47,7 +46,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
       all: rows.length,
       missing: rows.filter((r) => !r.hasEmail || !r.hasAddress).length,
       payment: rows.filter((r) => r.needsPayment).length,
-      model: rows.filter((r) => r.model.kind === "none").length,
+      nomodel: rows.filter((r) => !r.fields.model.trim()).length,
     }),
     [rows],
   );
@@ -57,7 +56,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
     const list = rows.filter((r) => {
       if (filter === "missing" && r.hasEmail && r.hasAddress) return false;
       if (filter === "payment" && !r.needsPayment) return false;
-      if (filter === "model" && r.model.kind !== "none") return false;
+      if (filter === "nomodel" && r.fields.model.trim()) return false;
       if (q && !`${r.name} ${r.fields.model} ${r.issue}`.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -149,7 +148,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
                 ["all", "All"],
                 ["missing", "Missing info"],
                 ["payment", "Payment"],
-                ["model", "Model unknown"],
+                ["nomodel", "No model"],
               ] as [Filter, string][]
             ).map(([k, label]) => (
               <button
@@ -211,7 +210,7 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
                   </span>
                   <span className="w-full truncate text-[13px] text-ink-2">{r.issue || "No issue text"}</span>
                   <span className="flex flex-wrap gap-1">
-                    {r.model.kind === "none" ? <Chip tone="amber">Model not in catalog</Chip> : r.model.kind === "fuzzy" ? <Chip tone="amber">Model ≈ {r.model.watch.name}</Chip> : null}
+                    {!r.fields.model.trim() ? <Chip tone="amber">No model</Chip> : null}
                     {!r.hasEmail ? <Chip tone="amber">No email</Chip> : null}
                     {!r.hasAddress ? <Chip tone="amber">No address</Chip> : null}
                     {r.countryUnknown ? <Chip tone="amber">Country?</Chip> : null}
@@ -267,13 +266,12 @@ export function IncomingView({ rows, catalog, brandId, brandName, syncedAt, stal
             <div className="mt-6">
               <h1 className="font-display text-[44px] leading-none font-semibold tracking-[-0.02em] text-ink sm:text-[56px]">{draft.customerName || selected.name || "No name"}</h1>
               <p className="mt-3 text-lg text-ink-2">
-                {selected.fields.model || "No model"} ·{" "}
-                {selected.model.kind === "exact" ? <span className="text-green">in catalog</span> : selected.model.kind === "fuzzy" ? <span className="text-amber">looks like {selected.model.watch.name}</span> : <span className="text-amber">model not in catalog</span>}
+                {selected.fields.model || <span className="text-amber">No model on the form</span>}
               </p>
             </div>
 
             <div className="mt-7 flex min-h-0 flex-1 flex-col">
-              <TicketForm draft={draft} onPatch={patch} catalog={catalog} brandId={brandId} context={{ kind: "sheet", row: selected, monthTab }} />
+              <TicketForm draft={draft} onPatch={patch} brandId={brandId} context={{ kind: "sheet", row: selected, monthTab }} />
             </div>
           </>
         )}

@@ -10,7 +10,7 @@ export default async function OpsLayout({ children }: LayoutProps<"/ops">) {
   const [user, ws] = await Promise.all([getCurrentUser(), getWorkspaceContext()]);
   if (!user) redirect(SIGN_IN_PATH);
   if (!ws.current || !canOpenOps(user.grants)) redirect("/service-center");
-  const show = (["watches", "components", "users", "workspace"] as OpsView[]).filter((p) => canOpenOpsPage(user.grants, p, ws.current!.id));
+  const show = (["users", "workspace"] as OpsView[]).filter((p) => canOpenOpsPage(user.grants, p, ws.current!.id));
   return (
     <>
       <OpsTabs show={show} />
