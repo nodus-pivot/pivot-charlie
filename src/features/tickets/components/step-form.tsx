@@ -6,7 +6,7 @@ import { ArrowUUpLeft, Check, CheckSquare, Package, Square, X } from "@phosphor-
 import { BigTick } from "@/components/ui/big-tick";
 import { Button } from "@/components/ui/button";
 import { ChoicePair } from "@/components/ui/choice-pair";
-import { STAGE_LABELS, TEST_KINDS, TEST_LABELS, nextStage, previousStep, type Step, type TestKind } from "@/features/pipeline";
+import { STAGE_LABELS, TEST_KINDS, TEST_LABELS, nextStage, type Step, type TestKind } from "@/features/pipeline";
 import { formatDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, setPartsReceived, setPayment, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip } from "../actions";
@@ -25,6 +25,12 @@ export type StepFormProps = {
   answer: boolean | null;
   notes: string;
   doneAt: string | null;
+  /** When the answer was last set, for the tick's time line after a reload. */
+  answeredAt: string | null;
+  /** Inspect is parked: anyone in scope may pick Yes, not just the step's owner. */
+  canUnpark: boolean;
+  /** The step "Back to" returns to: the last one worked, skipping skipped ones. */
+  backTo: Step | null;
   needsPayment: boolean;
   issue: string | null;
   inspectNotes: string | null;
@@ -76,7 +82,7 @@ export function StepForm(p: StepFormProps) {
   const pending = acting || saving;
 
   const next = nextStage(p.stage, p.needsPayment);
-  const prev = previousStep(p.stage, p.needsPayment);
+  const prev = p.backTo;
   const noteSpec = NOTES[p.stage];
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
@@ -92,7 +98,7 @@ export function StepForm(p: StepFormProps) {
   }
 
   function pickAnswer(v: boolean | null) {
-    if (!p.canAct) return;
+    if (!p.canAct && !(p.canUnpark && v === true)) return;
     const was = answer;
     setAnswer(v);
     setTickedAt(v ? new Date() : null);
@@ -102,7 +108,15 @@ export function StepForm(p: StepFormProps) {
       if (!r.ok) {
         setAnswer(was);
         setError(r.error);
-      } else router.refresh();
+        return;
+      }
+      // Cannot replicate parks the watch and tells Nodus straight away when the comments are already written.
+      if (p.stage === "inspect" && v === false && p.canAct && !p.slack && notes.trim()) {
+        if (notes !== p.notes) await setStepNotes(p.number, p.stage, notes);
+        const posted = await postToSlack(p.number, "cannot_replicate");
+        if (posted.ok && posted.slack && !posted.slack.ok) setNotice(`Parked on the ticket, but Slack said: ${posted.slack.error}`);
+      }
+      router.refresh();
     });
   }
 
@@ -156,15 +170,15 @@ export function StepForm(p: StepFormProps) {
   const slackTitle = p.stage === "supply" ? "Parts needed" : "Cannot replicate reported issue";
   const slackParts = p.slack ? parseSlackBody(p.slack.body) : null;
 
-  const tickHint = (when: string | null, text: string) => {
-    const d = when ? new Date(when) : tickedAt;
+  const tickHint = (text: string) => {
+    const d = tickedAt ?? (p.answeredAt ? new Date(p.answeredAt) : null);
     return d ? `${formatDate(d.toISOString())} · ${formatTime(d)} · ${text}` : text;
   };
 
   return (
     <div className="flex flex-col gap-[18px]">
       {p.stage === "check_in" ? (
-        <BigTick on={!!answer} onToggle={() => pickAnswer(!answer)} label="I have the watch" hint={answer ? tickHint(null, "emails the customer “We received your watch”.") : "Emails the customer “We received your watch”."} disabled={!p.canAct || pending} />
+        <BigTick on={!!answer} onToggle={() => pickAnswer(!answer)} label="I have the watch" hint={answer ? tickHint("emails the customer “We received your watch”.") : "Emails the customer “We received your watch”."} disabled={!p.canAct || pending} />
       ) : null}
 
       {p.stage === "inspect" || p.stage === "repair" ? (
@@ -180,7 +194,7 @@ export function StepForm(p: StepFormProps) {
             onChange={pickAnswer}
             yes={{ title: "Yes, I can see it", hint: "On to Supply." }}
             no={{ title: "No, cannot find or replicate it", hint: parked ? "Pick “Yes” to unpark and keep going." : "Parks here and tells Nodus customer service on Slack.", tone: "coral" }}
-            disabled={!p.canAct || pending}
+            disabled={(!p.canAct && !p.canUnpark) || pending}
             aria-label="Is the reported issue present?"
           />
         </Block>
@@ -240,7 +254,7 @@ export function StepForm(p: StepFormProps) {
             {p.stage === "supply" ? "Request parts on Slack" : "Tell Nodus on Slack"}
           </Button>
           <span className="text-[13px] text-ink-3">
-            {p.stage === "supply" ? `Posts to ${p.slackChannel ?? "Slack"} with your inspection comments attached. The ticket waits here until the parts arrive.` : `Posts your comments to ${p.slackChannel ?? "Slack"} so customer service can follow up.`}
+            {p.stage === "supply" ? `Posts to ${p.slackChannel ?? "Slack"} with your inspection comments attached. The ticket waits here until the parts arrive.` : notes.trim() ? `Posts your comments to ${p.slackChannel ?? "Slack"} so customer service can follow up.` : "Write what you found above, then tell Nodus."}
           </span>
         </div>
       ) : null}
@@ -250,7 +264,7 @@ export function StepForm(p: StepFormProps) {
       ) : null}
 
       {p.stage === "repair" ? (
-        <BigTick on={!!answer} onToggle={() => pickAnswer(!answer)} label="Repair complete" hint={answer ? tickHint(null, "ready for Test.") : "Tick when the work above is done."} disabled={!p.canAct || pending} />
+        <BigTick on={!!answer} onToggle={() => pickAnswer(!answer)} label="Repair complete" hint={answer ? tickHint("ready for Test.") : "Tick when the work above is done."} disabled={!p.canAct || pending} />
       ) : null}
 
       {p.stage === "test" ? (
@@ -339,12 +353,12 @@ export function StepForm(p: StepFormProps) {
         note={parked ? "Parked until Nodus replies." : p.stage === "check_in" ? "Nothing else to fill in here." : p.stage === "test" && !p.needsPayment ? "Payment not required, skipped" : undefined}
         pending={pending}
         canAct={p.canAct}
-        backLabel={prev ? STAGE_LABELS[prev] : null}
+        backLabel={prev && !parked ? STAGE_LABELS[prev] : null}
         onBack={() => prev && run(() => sendBack(p.number, prev))}
         extra={
           <>
             {p.stage === "inspect" && answer === false ? (
-              <button type="button" disabled={pending || !notes.trim()} onClick={() => run(() => skipToShip(p.number))} className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+              <button type="button" disabled={pending || !notes.trim()} onClick={() => run(() => skipToShip(p.number))} className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
                 <Package size={14} aria-hidden /> Nothing wrong · skip to Ship
               </button>
             ) : null}

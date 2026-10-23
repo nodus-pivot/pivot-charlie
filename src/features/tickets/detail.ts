@@ -60,6 +60,7 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
         done_at: s.done_at,
         done_by_name: s.done_by ? (nameOf.get(s.done_by) ?? null) : null,
         skipped: s.skipped,
+        updated_at: s.updated_at,
       })),
     messages: messages.data ?? [],
     tests: tests.data ?? [],

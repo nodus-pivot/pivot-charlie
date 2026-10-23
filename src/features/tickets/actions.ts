@@ -127,11 +127,11 @@ async function loadForStep(number: string, stage: Step) {
   return t;
 }
 
-/** The step's Yes / No (or the big tick). On Inspect, No parks the ticket. */
+/** The step's Yes / No (or the big tick). On Inspect, No parks the ticket; anyone in scope may pick Yes to unpark. */
 export async function setStepAnswer(number: string, stage: Step, answer: boolean | null): Promise<ActionResult> {
   const parsed = stepEnum.safeParse(stage);
   if (!parsed.success) return { ok: false, error: "Unknown step." };
-  const t = await loadForStep(number, parsed.data);
+  const t = await unparkOr(number, parsed.data, answer);
   if (!t.ok) return t;
   // Changing the Supply answer forgets an earlier "parts received".
   const patch = parsed.data === "supply" && answer !== false ? { answer, done_at: null, done_by: null } : { answer };
@@ -139,6 +139,18 @@ export async function setStepAnswer(number: string, stage: Step, answer: boolean
   if (error) return { ok: false, error: message(error) };
   refresh(number);
   return { ok: true };
+}
+
+/** Unparking (Inspect answered No, now Yes) is open to anyone who can see the ticket; everything else needs the step's owner. */
+async function unparkOr(number: string, stage: Step, answer: boolean | null) {
+  if (stage !== "inspect" || answer !== true) return loadForStep(number, stage);
+  const t = await load(number);
+  if (!t.ok) return t;
+  if (t.stage !== "inspect") return { ok: false as const, error: "The ticket is not at Inspect any more. Reload." };
+  if (canActOn(t.grants, "inspect", t.workspace_id, t.brand_id)) return t;
+  const { data: s } = await t.supabase.from("ticket_steps").select("answer").eq("ticket_id", t.id).eq("stage", "inspect").maybeSingle();
+  if (s?.answer === false) return t;
+  return { ok: false as const, error: "Your role doesn't own this step." };
 }
 
 /** The step's free text: inspection comments, parts list, what you did, test notes. Saved on blur. */

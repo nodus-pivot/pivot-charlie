@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/features/auth/queries";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
-import { canActOn, isAdminOf, type Step, type TestKind } from "@/features/pipeline";
+import { STEPS, canActOn, isAdminOf, type Step, type TestKind } from "@/features/pipeline";
 import { addressInline, type Address } from "@/lib/address";
 import { getTicketDetail, messageAuthors } from "@/features/tickets/detail";
 import { countTickets } from "@/features/tickets/queries";
@@ -37,6 +37,8 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
     const authors = messageAuthors(detail);
     const slackKind = stage === "supply" ? "parts_needed" : "cannot_replicate";
     const post = [...detail.messages].reverse().find((m) => m.channel === "slack" && m.kind === slackKind);
+    // Back goes to the last step actually worked, never into a skipped one.
+    const backTo = [...STEPS].slice(0, STEPS.indexOf(stage)).reverse().find((x) => !stepOf(detail, x)?.skipped) ?? null;
     const shipTo = t.return_to_everett ? (ws.current?.fulfillment_address as Address | null) : t.ship_to;
     step = (
       <StepForm
@@ -46,6 +48,9 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         answer={s?.answer ?? null}
         notes={s?.notes ?? ""}
         doneAt={s?.done_at ?? null}
+        answeredAt={s?.answer != null ? s.updated_at : null}
+        canUnpark={stage === "inspect" && s?.answer === false}
+        backTo={backTo}
         needsPayment={t.needs_payment}
         issue={t.issue}
         inspectNotes={stepOf(detail, "inspect")?.notes ?? null}

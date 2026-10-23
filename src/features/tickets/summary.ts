@@ -16,6 +16,7 @@ export type StepRecord = {
   done_at: string | null;
   done_by_name: string | null;
   skipped: boolean;
+  updated_at: string;
 };
 
 export type StepRow = { stage: Step; label: string; state: StepState; date: string | null; summary: string | null; skipped: boolean };
