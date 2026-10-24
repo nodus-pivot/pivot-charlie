@@ -54,17 +54,18 @@ export function StepActions({
         ) : null}
       </Button>
       {blocked && note ? (
-        <span className="text-[13px] text-ink-3">{note}</span>
+        <span className="min-w-0 flex-1 text-[13px] text-ink-3">{note}</span>
       ) : left.length ? (
-        <span className="text-[13px] text-ink-3">
+        <span className="min-w-0 flex-1 text-[13px] text-ink-3">
           <span className="text-amber">{left.length} left:</span> {left.join(" · ")}
+          {note ? <> · {note}</> : null}
         </span>
       ) : note ? (
-        <span className="text-[13px] text-ink-3">{note}</span>
+        <span className="min-w-0 flex-1 text-[13px] text-ink-3">{note}</span>
       ) : null}
       {extra}
       {backLabel ? (
-        <button type="button" disabled={pending} onClick={onBack} className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+        <button type="button" disabled={pending} onClick={onBack} className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
           <ArrowUUpLeft size={13} aria-hidden /> Back to {backLabel}
         </button>
       ) : null}

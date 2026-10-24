@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { ArrowUUpLeft, Check, CheckSquare, Package, Square, X } from "@phosphor-icons/react";
+import { CheckSquare, Package, Square } from "@phosphor-icons/react";
 import { BigTick } from "@/components/ui/big-tick";
 import { Button } from "@/components/ui/button";
 import { ChoicePair } from "@/components/ui/choice-pair";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, setPartsReceived, setPayment, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip } from "../actions";
 import { SlackCard, parseSlackBody } from "./slack-card";
 import { StepActions } from "./step-actions";
+import { TestRows } from "./test-rows";
 
 /**
  * The open step's form, driven by its ticket_steps row (answer, notes,
@@ -172,7 +173,7 @@ export function StepForm(p: StepFormProps) {
 
   const tickHint = (text: string) => {
     const d = tickedAt ?? (p.answeredAt ? new Date(p.answeredAt) : null);
-    return d ? `${formatDate(d.toISOString())} · ${formatTime(d)} · ${text}` : text;
+    return d ? [`${formatDate(d.toISOString())} · ${formatTime(d)}`, text].filter(Boolean).join(" · ") : text;
   };
 
   return (
@@ -213,7 +214,7 @@ export function StepForm(p: StepFormProps) {
         </Block>
       ) : null}
 
-      {noteSpec && (p.stage !== "supply" || (answer === false && (!p.slack || editingList))) ? (
+      {noteSpec && p.stage !== "test" && (p.stage !== "supply" || (answer === false && (!p.slack || editingList))) ? (
         <label className="flex flex-col gap-2">
           <span className="text-[11px] uppercase tracking-label text-ink-3">{noteSpec.label}</span>
           <textarea
@@ -221,10 +222,10 @@ export function StepForm(p: StepFormProps) {
             onChange={(e) => setNotes(e.target.value)}
             onBlur={blurNotes}
             disabled={!p.canAct}
-            rows={p.stage === "test" ? 2 : 4}
+            rows={4}
             autoFocus={editingList}
             placeholder={noteSpec.placeholder}
-            className="min-h-24 w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none"
+            className={cn("w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none", p.stage === "repair" ? "min-h-[110px]" : "min-h-24")}
           />
         </label>
       ) : null}
@@ -273,39 +274,39 @@ export function StepForm(p: StepFormProps) {
       ) : null}
 
       {p.stage === "repair" ? (
-        <BigTick on={!!answer} onToggle={() => pickAnswer(!answer)} label="Repair complete" hint={answer ? tickHint("ready for Test.") : "Tick when the work above is done."} disabled={!p.canAct || pending} />
+        <BigTick on={!!answer} onToggle={() => pickAnswer(!answer)} label="Repair complete" hint={answer ? tickHint("") : "Tick when the work above is done."} disabled={!p.canAct || pending} />
       ) : null}
 
       {p.stage === "test" ? (
-        <div className="flex flex-col gap-2.5">
+        <>
           {p.tests.attempt > 1 ? (
             <span className="text-[11px] uppercase tracking-label text-amber">
               Attempt {p.tests.attempt} · <span className="normal-case tracking-normal">{p.tests.previousFails.map((f) => `${TEST_LABELS[f.kind]} failed${f.note ? ` (${f.note})` : ""}`).join(" · ")}</span>
             </span>
           ) : null}
-          {TEST_KINDS.map((kind) => {
-            const ok = passed.includes(kind);
-            return (
-              <div key={kind} className={cn("flex flex-wrap items-center gap-3 rounded-xs border px-[18px] py-3.5", ok ? "border-green/60 bg-green/5" : failing === kind ? "border-coral/60 bg-coral/5" : "border-border-strong")}>
-                <span className="flex-1 text-[17px] font-medium text-ink">{TEST_LABELS[kind]}</span>
-                <Pill on={ok} tone="green" onClick={() => toggleTest(kind)} disabled={!p.canAct || pending}><Check size={11} /> Pass</Pill>
-                <Pill on={failing === kind} tone="coral" onClick={() => { if (!p.canAct) return; setFailing(failing === kind ? null : kind); setFailNote(""); }} disabled={!p.canAct || pending}><X size={11} /> Fail</Pill>
-              </div>
-            );
-          })}
-          {failing ? (
-            <div className="flex flex-col gap-3 border border-coral/60 bg-coral/5 p-4 sm:flex-row sm:items-end">
-              <label className="flex flex-1 flex-col gap-2 text-[11px] uppercase tracking-label text-ink-3">
-                What failed on {TEST_LABELS[failing]}?
-                <input value={failNote} onChange={(e) => setFailNote(e.target.value)} autoFocus className="h-9 border-b border-border-strong bg-transparent text-[15px] normal-case tracking-normal text-ink outline-none focus:border-gold" />
-              </label>
-              <Button size="sm" variant="ghost" onClick={() => setFailing(null)}>Cancel</Button>
-              <Button size="sm" variant="primary" disabled={pending} onClick={() => run(() => failTest(p.number, failing, failNote))} className="border-coral text-coral hover:bg-coral/10">
-                Send back to Repair <ArrowUUpLeft size={13} />
-              </Button>
-            </div>
-          ) : null}
-        </div>
+          <TestRows
+            passed={passed}
+            failing={failing}
+            failNote={failNote}
+            onPass={toggleTest}
+            onFailPick={(k) => { setFailing(k); setFailNote(""); }}
+            onFailNote={setFailNote}
+            onSendBack={() => failing && run(() => failTest(p.number, failing, failNote))}
+            disabled={!p.canAct || pending}
+          />
+          <label className="flex flex-col gap-2">
+            <span className="text-[11px] uppercase tracking-label text-ink-3">Test notes</span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={blurNotes}
+              disabled={!p.canAct}
+              rows={2}
+              placeholder="+2 s/d dial up, amplitude 280°. 200 m pass."
+              className="min-h-[72px] w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none"
+            />
+          </label>
+        </>
       ) : null}
 
       {p.stage === "payment" ? (
@@ -359,7 +360,7 @@ export function StepForm(p: StepFormProps) {
         onPrimary={() => run(() => advanceTicket(p.number))}
         blocked={parked}
         left={left}
-        note={parked ? "Parked until Nodus replies." : p.stage === "check_in" ? "Nothing else to fill in here." : p.stage === "test" && !p.needsPayment ? "Payment not required, skipped" : undefined}
+        note={parked ? "Parked until Nodus replies." : p.stage === "check_in" ? "Nothing else to fill in here." : p.stage === "test" ? ["a Fail sends the watch back to Repair with the note attached", !p.needsPayment ? "Payment not required, skipped" : null].filter(Boolean).join(" · ") : undefined}
         pending={pending}
         canAct={p.canAct}
         backLabel={prev && !parked ? STAGE_LABELS[prev] : null}
@@ -391,16 +392,6 @@ function Block({ label, gap = "gap-2", children }: { label: string; gap?: string
       <span className="text-[11px] uppercase tracking-label text-ink-3">{label}</span>
       {children}
     </div>
-  );
-}
-
-function Pill({ on, tone, onClick, disabled, children }: { on: boolean; tone: "green" | "coral"; onClick: () => void; disabled: boolean; children: ReactNode }) {
-  const active = tone === "green" ? "border-green bg-green/14 text-green" : "border-coral bg-coral/14 text-coral";
-  const hover = tone === "green" ? "hover:border-green hover:text-green" : "hover:border-coral hover:text-coral";
-  return (
-    <button type="button" aria-pressed={on} disabled={disabled} onClick={onClick} className={cn("inline-flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-xs leading-none transition-colors", on ? active : `border-border-strong text-ink-3 ${hover}`)}>
-      {children}
-    </button>
   );
 }
 
