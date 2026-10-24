@@ -30,7 +30,7 @@ export type SlackCardProps = {
   replyNote: string | null;
   /** Set when the post never reached Slack: the card shows why. */
   failed: string | null;
-  /** Set when replies could not be read (missing scope, deleted post). */
+  /** Set when replies could not be read (missing scope, deleted post): the footer shows nothing about replies. */
   repliesError?: string | null;
   onEdit?: () => void;
   onRepost?: () => void;
@@ -86,9 +86,7 @@ export function SlackCard(p: SlackCardProps) {
           </>
         ) : (
           <>
-            {p.repliesError ? (
-              <span className="inline-flex items-center gap-1.5 text-amber"><WarningCircle size={14} aria-hidden /> Replies can&rsquo;t be read · {p.repliesError}</span>
-            ) : (
+            {p.repliesError ? null : (
               <span className="inline-flex items-center gap-1.5"><ChatCircle size={14} aria-hidden /> {p.replies ? `${p.replies} repl${p.replies === 1 ? "y" : "ies"}` : "No replies yet"}</span>
             )}
             {!p.repliesError && p.replyNote ? <span className="truncate">{p.replyNote}</span> : null}
