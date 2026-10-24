@@ -91,7 +91,8 @@ async function refreshReplies(supabase: Awaited<ReturnType<typeof createClient>>
   const updates = await Promise.all(
     stale.map(async (m) => {
       const r = await fetchSlackReplies(m.external_id!);
-      const patch = r ? { reply_count: r.count, last_reply: r.last, replies_checked_at: new Date(now).toISOString() } : { replies_checked_at: new Date(now).toISOString() };
+      const checked = new Date(now).toISOString();
+      const patch = r.ok ? { reply_count: r.count, last_reply: r.last, replies_checked_at: checked, replies_error: null } : { replies_checked_at: checked, replies_error: r.error };
       await supabase.from("ticket_messages").update(patch).eq("id", m.id);
       return [m.id, { ...m, ...patch }] as const;
     }),

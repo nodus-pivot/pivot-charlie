@@ -1,5 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { ArrowCounterClockwise, ChatCircle, CheckCircle, PencilSimple, SlackLogo, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, ChatCircle, CheckCircle, PencilSimple, SlackLogo, WarningCircle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,8 +30,12 @@ export type SlackCardProps = {
   replyNote: string | null;
   /** Set when the post never reached Slack: the card shows why. */
   failed: string | null;
+  /** Set when replies could not be read (missing scope, deleted post). */
+  repliesError?: string | null;
   onEdit?: () => void;
   onRepost?: () => void;
+  /** Edit the list inside the card: the lines become a textarea, the footer posts or cancels. */
+  edit?: { value: string; onChange: (v: string) => void; onPost: () => void; onCancel: () => void; placeholder?: string };
   busy?: boolean;
 };
 
@@ -50,18 +56,48 @@ export function SlackCard(p: SlackCardProps) {
         <div>
           <b className="font-semibold">{p.title}</b> · <span className="font-mono text-ink-2">{p.number}</span> · {p.watch} · {p.customer}
         </div>
-        {p.lines.map((l, i) => (
-          <div key={i} className="text-ink-2">{l}</div>
-        ))}
+        {p.edit ? (
+          <textarea
+            value={p.edit.value}
+            onChange={(e) => p.edit!.onChange(e.target.value)}
+            autoFocus
+            rows={Math.max(3, p.edit.value.split("\n").length + 1)}
+            placeholder={p.edit.placeholder}
+            aria-label="Parts you need, one per line"
+            className="w-full resize-y rounded-xs border border-gold bg-ground px-3 py-2 text-[14px] leading-[1.55] text-ink outline-none placeholder:text-ink-3"
+          />
+        ) : (
+          p.lines.map((l, i) => (
+            <div key={i} className="text-ink-2">{l}</div>
+          ))
+        )}
         {p.quote ? <div className="border-l-2 border-border-strong pl-3 text-ink-2">{p.quote}</div> : null}
       </div>
       <div className="flex flex-wrap items-center gap-3.5 border-t border-rule px-4 py-2.5 text-[13px] text-ink-3">
-        <span className="inline-flex items-center gap-1.5"><ChatCircle size={14} aria-hidden /> {p.replies ? `${p.replies} repl${p.replies === 1 ? "y" : "ies"}` : "No replies yet"}</span>
-        {p.replyNote ? <span className="truncate">{p.replyNote}</span> : null}
-        <span className="ml-auto flex items-center gap-3.5">
-          {p.onEdit ? <FooterAction onClick={p.onEdit} disabled={p.busy}><PencilSimple size={14} aria-hidden /> Edit list</FooterAction> : null}
-          {p.onRepost ? <FooterAction onClick={p.onRepost} disabled={p.busy}><ArrowCounterClockwise size={14} aria-hidden /> Post again</FooterAction> : null}
-        </span>
+        {p.edit ? (
+          <>
+            <span>Posts the list again as a new message; the old one stays in Slack.</span>
+            <span className="ml-auto flex items-center gap-3.5">
+              <FooterAction onClick={p.edit.onCancel} disabled={p.busy}>Cancel</FooterAction>
+              <button type="button" onClick={p.edit.onPost} disabled={p.busy || !p.edit.value.trim()} className="inline-flex items-center gap-1.5 rounded-xs border border-gold px-3 py-1.5 text-[13px] font-medium text-gold-light transition-colors hover:bg-gold/10 disabled:opacity-60">
+                <ArrowCounterClockwise size={14} aria-hidden /> Post updated list
+              </button>
+            </span>
+          </>
+        ) : (
+          <>
+            {p.repliesError ? (
+              <span className="inline-flex items-center gap-1.5 text-amber"><WarningCircle size={14} aria-hidden /> Replies can&rsquo;t be read · {p.repliesError}</span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5"><ChatCircle size={14} aria-hidden /> {p.replies ? `${p.replies} repl${p.replies === 1 ? "y" : "ies"}` : "No replies yet"}</span>
+            )}
+            {!p.repliesError && p.replyNote ? <span className="truncate">{p.replyNote}</span> : null}
+            <span className="ml-auto flex items-center gap-3.5">
+              {p.onEdit ? <FooterAction onClick={p.onEdit} disabled={p.busy}><PencilSimple size={14} aria-hidden /> Edit list</FooterAction> : null}
+              {p.onRepost ? <FooterAction onClick={p.onRepost} disabled={p.busy}><ArrowCounterClockwise size={14} aria-hidden /> Post again</FooterAction> : null}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

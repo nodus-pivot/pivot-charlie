@@ -320,6 +320,7 @@ export type Database = {
           last_reply: string | null
           recipient: string | null
           replies_checked_at: string | null
+          replies_error: string | null
           reply_count: number
           status: Database["public"]["Enums"]["message_status"]
           subject: string | null
@@ -337,6 +338,7 @@ export type Database = {
           last_reply?: string | null
           recipient?: string | null
           replies_checked_at?: string | null
+          replies_error?: string | null
           reply_count?: number
           status?: Database["public"]["Enums"]["message_status"]
           subject?: string | null
@@ -354,6 +356,7 @@ export type Database = {
           last_reply?: string | null
           recipient?: string | null
           replies_checked_at?: string | null
+          replies_error?: string | null
           reply_count?: number
           status?: Database["public"]["Enums"]["message_status"]
           subject?: string | null

@@ -65,7 +65,8 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         customer={t.customer_name}
         watch={t.watch}
         slackChannel={slackChannelName()}
-        slack={post ? { postedAt: `${formatDate(post.created_at)} · ${formatTime(post.created_at)}`, by: ((post.created_by && authors.get(post.created_by)) || "Pivot").split(/\s+/)[0], body: post.body, replies: post.reply_count, lastReply: post.last_reply, failed: post.status === "failed" ? (post.error ?? "unknown error") : null } : null}
+        slack={post ? { postedAt: `${formatDate(post.created_at)} · ${formatTime(post.created_at)}`, by: ((post.created_by && authors.get(post.created_by)) || "Pivot").split(/\s+/)[0], body: post.body, replies: post.reply_count, lastReply: post.last_reply, failed: post.status === "failed" ? (post.error ?? "unknown error") : null, repliesError: post.replies_error ?? null } : null}
+        benchPhotos={detail.photos.filter((x) => x.kind === "bench").map((x) => ({ id: x.id, path: x.storage_path }))}
         canAct={canAct}
         isAdmin={isAdminOf(user.grants, t.workspace_id)}
       />

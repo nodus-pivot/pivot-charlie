@@ -205,6 +205,7 @@ create table ticket_messages (
   reply_count int not null default 0,
   last_reply text,
   replies_checked_at timestamptz,
+  replies_error text,
   created_by uuid references profiles(id),
   created_at timestamptz not null default now()
 );
