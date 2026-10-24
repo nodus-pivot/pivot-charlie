@@ -51,6 +51,11 @@ src/
   live in `features/intake`. Nothing else imports the Sheets client.
 - **`features/pipeline` has no React.** Stage order, labels, gate explanations and summaries are
   plain TypeScript with vitest tests.
+- **One step form.** `features/tickets/components/step-form.tsx` renders the open step from its
+  `ticket_steps` row and composes the handoff's pieces: `big-tick`, `choice-pair` (in
+  `components/ui`), `slack-card`, `parked-banner`, `step-actions`, `test-rows`, `payment-step`,
+  `ship-step`, and `closed-view` (the Summary block). Each step's gate is mirrored in the form only
+  to grey the primary button and say what is left; the database decides.
 - **Database types are generated**: `npm run db:types` after every migration, committed together.
   The schema is one baseline migration (`docs/SCHEMA-V2.md`); while the app is pre-launch, schema
   changes edit that file and `supabase db reset --linked` reseeds from `supabase/seed.py`.
