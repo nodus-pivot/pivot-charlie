@@ -360,12 +360,12 @@ export function StepForm(p: StepFormProps) {
         extra={
           <>
             {p.stage === "inspect" && answer === false ? (
-              <button type="button" disabled={pending || !notes.trim()} onClick={() => run(() => skipToShip(p.number))} className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+              <button type="button" disabled={pending || !notes.trim()} onClick={() => run(() => skipToShip(p.number))} className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
                 <Package size={14} aria-hidden /> Nothing wrong · skip to Ship
               </button>
             ) : null}
             {canOverride ? (
-              <button type="button" disabled={pending} onClick={() => run(() => advanceTicket(p.number, { override: true }))} className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+              <button type="button" disabled={pending} onClick={() => run(() => advanceTicket(p.number, { override: true }))} className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
                 <CrownSimple size={14} aria-hidden /> Owner override · ship unpaid
               </button>
             ) : null}

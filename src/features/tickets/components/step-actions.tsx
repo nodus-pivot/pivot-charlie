@@ -43,32 +43,36 @@ export function StepActions({
 }) {
   if (!canAct) return <p className="text-[13px] text-ink-3">{waitingText ?? "Waiting for the bench."}</p>;
   const disabled = pending || blocked || left.length > 0;
+  const status = blocked && note ? (
+    <span className="min-w-0 flex-1 text-[13px] text-ink-3 sm:text-right">{note}</span>
+  ) : left.length ? (
+    <span className="min-w-0 flex-1 text-[13px] text-ink-3 sm:text-right">
+      <span className="text-amber">{left.length} left:</span> {left.join(" · ")}
+      {note ? <> · {note}</> : null}
+    </span>
+  ) : note ? (
+    <span className="min-w-0 flex-1 text-[13px] text-ink-3 sm:text-right">{note}</span>
+  ) : null;
+  // Back on the left, forward on the right: the row reads in the direction the ticket moves.
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      <Button variant="primary" disabled={disabled} onClick={onPrimary} className={cn(disabled && !pending && "opacity-60")}>
-        {pending ? "Saving…" : label}
-        {next ? (
-          <>
-            <ArrowRight size={14} aria-hidden /> {next}
-          </>
-        ) : null}
-      </Button>
-      {blocked && note ? (
-        <span className="min-w-0 flex-1 text-[13px] text-ink-3">{note}</span>
-      ) : left.length ? (
-        <span className="min-w-0 flex-1 text-[13px] text-ink-3">
-          <span className="text-amber">{left.length} left:</span> {left.join(" · ")}
-          {note ? <> · {note}</> : null}
-        </span>
-      ) : note ? (
-        <span className="min-w-0 flex-1 text-[13px] text-ink-3">{note}</span>
-      ) : null}
-      {extra}
+    <div className="flex items-start gap-4">
       {backLabel ? (
-        <button type="button" disabled={pending} onClick={onBack} className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+        <button type="button" disabled={pending} onClick={onBack} className="inline-flex shrink-0 items-center gap-1.5 self-center text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
           <ArrowUUpLeft size={13} aria-hidden /> Back to {backLabel}
         </button>
       ) : null}
+      <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2">
+        {extra}
+        {status}
+        <Button variant="primary" disabled={disabled} onClick={onPrimary} className={cn("shrink-0", disabled && !pending && "opacity-60")}>
+          {pending ? "Saving…" : label}
+          {next ? (
+            <>
+              <ArrowRight size={14} aria-hidden /> {next}
+            </>
+          ) : null}
+        </Button>
+      </div>
     </div>
   );
 }
