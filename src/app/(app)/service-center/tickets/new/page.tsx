@@ -46,7 +46,7 @@ export default async function NewTicketPage() {
       />
       <section className="flex flex-col px-4 pb-10 pt-7 sm:px-8 lg:px-12">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-4">
-          <Eyebrow>By hand · for walk-ins</Eyebrow>
+          <Eyebrow>Walk-in or phone · nothing from the sheet</Eyebrow>
           <span className="text-sm text-ink-2">
             Website requests come through{" "}
             <Link href="/service-center/incoming" className="text-gold-light hover:text-gold">

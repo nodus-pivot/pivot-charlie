@@ -174,13 +174,13 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
       <div className="grid gap-x-14 lg:grid-cols-2">
         <div>
           <FieldRow label="Customer" source={src("Name")}>
-            <TextInput value={draft.customerName} onChange={(v) => onPatch({ customerName: v })} placeholder="Full name" />
+            <TextInput value={draft.customerName} onChange={(v) => onPatch({ customerName: v })} placeholder="Customer name" />
           </FieldRow>
           <FieldRow label="Email" source={src("Email")}>
-            <TextInput value={draft.customerEmail} onChange={(v) => onPatch({ customerEmail: v })} placeholder={sheet ? "Missing on the form" : "name@example.com"} type="email" />
+            <TextInput value={draft.customerEmail} onChange={(v) => onPatch({ customerEmail: v })} placeholder={sheet ? "Missing on the form" : "Email"} type="email" />
           </FieldRow>
           <FieldRow label="Phone">
-            <TextInput value={draft.customerPhone} onChange={(v) => onPatch({ customerPhone: v })} placeholder={sheet ? "Not on the form" : "Optional"} />
+            <TextInput value={draft.customerPhone} onChange={(v) => onPatch({ customerPhone: v })} placeholder={sheet ? "Not on the form" : "Phone · optional"} />
           </FieldRow>
           <FieldRow label={sheet ? "Ship to" : "Return address"} source={src("Address · City · State · Zip · Country")}>
             <div className="grid gap-2">
@@ -200,7 +200,7 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
             <TextInput value={draft.watch} onChange={(v) => onPatch({ watch: v })} placeholder={sheet ? "Missing on the form" : "Model, as the customer calls it"} />
           </FieldRow>
           <FieldRow label="Serial" source={src("Serial Number")}>
-            <TextInput value={draft.serial} onChange={(v) => onPatch({ serial: v })} placeholder="Optional" mono />
+            <TextInput value={draft.serial} onChange={(v) => onPatch({ serial: v })} placeholder={sheet ? "Optional" : "Serial · optional"} mono />
           </FieldRow>
           <FieldRow
             label="Coverage"
@@ -216,10 +216,11 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
             <span className="text-[17px] text-ink">
               {draft.coverage === "paid" ? "Paid repair · adds the Payment step" : "Warranty"}
             </span>
+            {!sheet ? <span className="text-xs text-ink-3">Paid adds the Payment step before Ship</span> : null}
             {sheet ? (
               <span className="text-xs text-ink-3">
                 Sheet says Payment Required = {sheet.fields.paymentRequired || "blank"}
-                {sheet.paymentAmount !== null ? ` · $${sheet.paymentAmount} in the issue text` : ""}
+                {sheet.paymentAmount !== null ? ` · $${sheet.paymentAmount} in the issue text` : ""} · Paid adds the Payment step
               </span>
             ) : null}
           </FieldRow>
@@ -252,7 +253,7 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
           onChange={(e) => onPatch({ issue: e.target.value })}
           rows={3}
           className="w-full resize-y bg-transparent text-[17px] leading-[1.45] text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
-          placeholder="In their words"
+          placeholder={sheet ? "In their words" : "What did the customer report?"}
         />
         {sheet?.claimRef ? <span className="font-mono text-xs text-ink-3">Claim {sheet.claimRef}</span> : null}
         {!sheet ? (
@@ -274,7 +275,7 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
           onChange={(e) => onPatch({ benchNote: e.target.value })}
           rows={2}
           className="w-full resize-y bg-transparent text-[17px] leading-[1.45] text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
-          placeholder="Anything the watchmaker should know"
+          placeholder="Type here"
         />
       </FieldRow>
 
@@ -282,15 +283,15 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
         {error ? <p role="alert" className="text-sm text-coral">{error}</p> : null}
         <div className="flex flex-wrap items-center gap-4">
           <Button variant="primary" disabled={pending || missing.length > 0} onClick={submit}>
-            {uploading ? "Adding photos…" : pending ? "Creating…" : "Create ticket"} <ArrowRight size={14} />
+            {uploading ? "Adding photos…" : pending ? "Creating…" : "Create ticket"} <ArrowRight size={14} /> Check in
           </Button>
           <span className="text-[13px] text-ink-2">
             {missing.length ? (
               <>
-                <span className="text-gold-light">{missing.length} left:</span> {missing.join(", ")} · opens on Check in
+                <span className="text-gold-light">{missing.length} left:</span> {missing.join(", ")} · opens at Check in
               </>
             ) : (
-              "Opens on Check in."
+              context.kind === "sheet" ? `Saves to the ticket and moves the sheet row to “${context.monthTab}”.` : "Opens the ticket at Check in."
             )}
           </span>
         </div>
@@ -298,7 +299,7 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
           <p className="flex items-start gap-2 text-[13px] text-ink-3">
             <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
             <span>
-              Creating moves the row from <span className="font-mono">Incoming Watches</span> to <span className="font-mono">{context.monthTab}</span> as it was, and opens the ticket on Check in. Your edits live only on the ticket.
+              The row moves from <span className="font-mono">Incoming Watches</span> to <span className="font-mono">{context.monthTab}</span> as it was. Your edits live only on the ticket.
             </span>
           </p>
         ) : null}
