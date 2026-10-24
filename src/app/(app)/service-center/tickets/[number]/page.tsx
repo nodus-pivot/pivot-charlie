@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/features/auth/queries";
 import { SIGN_IN_PATH } from "@/features/auth/redirect";
 import { STEPS, canActOn, isAdminOf, type Step, type TestKind } from "@/features/pipeline";
-import { addressInline, type Address } from "@/lib/address";
+import type { Address } from "@/lib/address";
 import { getTicketDetail, messageAuthors } from "@/features/tickets/detail";
 import { countTickets } from "@/features/tickets/queries";
 import { stepOf } from "@/features/tickets/summary";
@@ -39,6 +39,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
     const post = [...detail.messages].reverse().find((m) => m.channel === "slack" && m.kind === slackKind);
     // Back goes to the last step actually worked, never into a skipped one.
     const backTo = [...STEPS].slice(0, STEPS.indexOf(stage)).reverse().find((x) => !stepOf(detail, x)?.skipped) ?? null;
+    const shippedEmail = detail.messages.find((m) => m.channel === "email" && m.kind === "shipped") ?? null;
     const shipTo = t.return_to_everett ? (ws.current?.fulfillment_address as Address | null) : t.ship_to;
     step = (
       <StepForm
@@ -60,7 +61,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
           passed: detail.tests.filter((x) => x.attempt === t.test_attempt && x.result === "pass").map((x) => x.kind as TestKind),
           previousFails: detail.tests.filter((x) => x.attempt < t.test_attempt && x.result === "fail").map((x) => ({ attempt: x.attempt, kind: x.kind as TestKind, note: x.note })),
         }}
-        ship={{ carrier: t.ship_carrier ?? "", tracking: t.ship_tracking ?? "", labelUrl: t.label_url ?? "", shipToLine: shipTo ? [shipTo.name, addressInline(shipTo)].filter(Boolean).join(" · ") : null }}
+        ship={{ carrier: t.ship_carrier ?? "", tracking: t.ship_tracking ?? "", labelUrl: t.label_url ?? "", shipTo, everett: t.return_to_everett, email: t.customer_email, shippedEmailAt: shippedEmail ? `${formatDate(shippedEmail.created_at)} · ${formatTime(shippedEmail.created_at)}` : null }}
         customer={t.customer_name}
         watch={t.watch}
         slackChannel={slackChannelName()}

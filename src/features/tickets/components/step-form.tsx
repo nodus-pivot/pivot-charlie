@@ -2,17 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { CheckSquare, Package, Square } from "@phosphor-icons/react";
+import { CrownSimple, Package } from "@phosphor-icons/react";
 import { BigTick } from "@/components/ui/big-tick";
 import { Button } from "@/components/ui/button";
 import { ChoicePair } from "@/components/ui/choice-pair";
 import { STAGE_LABELS, TEST_KINDS, TEST_LABELS, nextStage, type Step, type TestKind } from "@/features/pipeline";
 import { formatDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, setPartsReceived, setPayment, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip } from "../actions";
+import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, setPartsReceived, setPayment, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip, updateShipTo } from "../actions";
 import { SlackCard, parseSlackBody } from "./slack-card";
 import { StepActions } from "./step-actions";
 import { TestRows } from "./test-rows";
+import { PaymentStep } from "./payment-step";
+import { ShipStep } from "./ship-step";
+import type { Address } from "@/lib/address";
 
 /**
  * The open step's form, driven by its ticket_steps row (answer, notes,
@@ -39,7 +42,7 @@ export type StepFormProps = {
   watch: string;
   payment: { amount: number | null; invoiceSentAt: string | null };
   tests: { attempt: number; passed: TestKind[]; previousFails: { attempt: number; kind: TestKind; note: string | null }[] };
-  ship: { carrier: string; tracking: string; labelUrl: string; shipToLine: string | null };
+  ship: { carrier: string; tracking: string; labelUrl: string; shipTo: Address | null; everett: boolean; email: string | null; shippedEmailAt: string | null };
   slackChannel: string | null;
   slack: { postedAt: string; by: string; body: string; replies: number; lastReply: string | null; failed: string | null } | null;
   canAct: boolean;
@@ -310,48 +313,33 @@ export function StepForm(p: StepFormProps) {
       ) : null}
 
       {p.stage === "payment" ? (
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Block label="Repair cost">
-              <span className="flex items-baseline gap-1 font-display text-[28px] font-semibold text-ink">
-                $
-                <input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-                  onBlur={() => p.canAct && run(() => setPayment(p.number, { amount: amount ? Number(amount) : null, invoiceSent }))}
-                  disabled={!p.canAct}
-                  inputMode="decimal"
-                  placeholder="0"
-                  className="w-28 bg-transparent font-display text-[28px] font-semibold text-ink outline-none placeholder:text-ink-3"
-                  aria-label="Repair cost"
-                />
-              </span>
-            </Block>
-            <Block label="Invoice">
-              <button type="button" disabled={!p.canAct || pending} onClick={() => { const v = !invoiceSent; setInvoiceSent(v); run(() => setPayment(p.number, { amount: amount ? Number(amount) : null, invoiceSent: v })); }} className="flex items-center gap-2 text-[15px] text-ink-2 hover:text-ink">
-                {invoiceSent ? <CheckSquare size={20} className="text-gold-light" /> : <Square size={20} className="text-ink-3" />}
-                {invoiceSent ? `Sent${p.payment.invoiceSentAt ? ` ${formatDate(p.payment.invoiceSentAt)}` : " today"}` : "Not sent yet"}
-              </button>
-            </Block>
-            <Block label="Status">
-              <span className={cn("text-[15px]", answer ? "text-green" : "text-amber")}>{answer ? "Paid" : "Not paid yet"}</span>
-            </Block>
-          </div>
-          <BigTick on={!!answer} onToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }} label="Payment received" hint="Tick when the customer has paid. Warranty repairs skip this step." disabled={!p.canAct || pending} />
-        </div>
+        <PaymentStep
+          amount={amount}
+          onAmount={setAmount}
+          onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPayment(p.number, { amount: amount ? Number(amount) : null, invoiceSent }))}
+          invoiceSent={invoiceSent}
+          invoiceSentAt={p.payment.invoiceSentAt}
+          onInvoiceToggle={() => { const v = !invoiceSent; setInvoiceSent(v); run(() => setPayment(p.number, { amount: amount ? Number(amount) : null, invoiceSent: v })); }}
+          paid={!!answer}
+          onPaidToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }}
+          disabled={!p.canAct || pending}
+        />
       ) : null}
 
       {p.stage === "ship" ? (
-        <div className="flex flex-col gap-4">
-          <Block label="Ship to">
-            <span className="text-[15px] text-ink">{p.ship.shipToLine || <span className="text-amber">No address on the ticket</span>}</span>
-          </Block>
-          <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
-            <Field label="Carrier" value={ship.carrier} onChange={(v) => setShip({ ...ship, carrier: v })} onBlur={() => p.canAct && run(() => saveShipping(p.number, ship))} placeholder="USPS" disabled={!p.canAct} />
-            <Field label="Tracking" value={ship.tracking} onChange={(v) => setShip({ ...ship, tracking: v })} onBlur={() => p.canAct && run(() => saveShipping(p.number, ship))} placeholder="9400 1108 …" disabled={!p.canAct} mono />
-          </div>
-          <p className="text-[13px] text-ink-3">Generate label (ShipStation) arrives in a later round; enter tracking by hand for now.</p>
-        </div>
+        <ShipStep
+          name={p.customer}
+          shipTo={p.ship.shipTo}
+          everett={p.ship.everett}
+          onSaveAddress={async (a) => { const r = await updateShipTo(p.number, a); if (!r.ok) setError(r.error); else router.refresh(); return r.ok; }}
+          fields={ship}
+          onFields={setShip}
+          onFieldsBlur={() => p.canAct && (ship.carrier !== p.ship.carrier || ship.tracking !== p.ship.tracking) && run(() => saveShipping(p.number, ship))}
+          labelGeneratedAt={null}
+          email={p.ship.email}
+          shippedEmail={p.ship.shippedEmailAt ? { at: p.ship.shippedEmailAt } : null}
+          disabled={!p.canAct || pending}
+        />
       ) : null}
 
       <StepActions
@@ -360,7 +348,7 @@ export function StepForm(p: StepFormProps) {
         onPrimary={() => run(() => advanceTicket(p.number))}
         blocked={parked}
         left={left}
-        note={parked ? "Parked until Nodus replies." : p.stage === "check_in" ? "Nothing else to fill in here." : p.stage === "test" ? ["a Fail sends the watch back to Repair with the note attached", !p.needsPayment ? "Payment not required, skipped" : null].filter(Boolean).join(" · ") : undefined}
+        note={parked ? "Parked until Nodus replies." : p.stage === "check_in" ? "Nothing else to fill in here." : p.stage === "ship" ? "Closes the ticket and writes the summary." : p.stage === "test" ? ["a Fail sends the watch back to Repair with the note attached", !p.needsPayment ? "Payment not required, skipped" : null].filter(Boolean).join(" · ") : undefined}
         pending={pending}
         canAct={p.canAct}
         backLabel={prev && !parked ? STAGE_LABELS[prev] : null}
@@ -373,8 +361,8 @@ export function StepForm(p: StepFormProps) {
               </button>
             ) : null}
             {canOverride ? (
-              <button type="button" disabled={pending} onClick={() => run(() => advanceTicket(p.number, { override: true }))} className="text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
-                Owner override · ship unpaid
+              <button type="button" disabled={pending} onClick={() => run(() => advanceTicket(p.number, { override: true }))} className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+                <CrownSimple size={14} aria-hidden /> Owner override · ship unpaid
               </button>
             ) : null}
           </>
@@ -392,14 +380,5 @@ function Block({ label, gap = "gap-2", children }: { label: string; gap?: string
       <span className="text-[11px] uppercase tracking-label text-ink-3">{label}</span>
       {children}
     </div>
-  );
-}
-
-function Field({ label, value, onChange, onBlur, placeholder, disabled, mono }: { label: string; value: string; onChange: (v: string) => void; onBlur: () => void; placeholder?: string; disabled?: boolean; mono?: boolean }) {
-  return (
-    <label className="flex flex-col gap-2">
-      <span className="text-[11px] uppercase tracking-label text-ink-3">{label}</span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} disabled={disabled} placeholder={placeholder} className={cn("h-10 border-b border-border-strong bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none", mono && "font-mono")} />
-    </label>
   );
 }

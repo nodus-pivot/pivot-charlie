@@ -10,7 +10,7 @@ import type { TicketDetail } from "../detail";
 import { closedRows, parkedState, statusWord, stepOf, stepRows, type SummaryInput } from "../summary";
 import { Dossier, type DossierData } from "./dossier";
 import { StepRail } from "./step-rail";
-import { ClosedView } from "./closed-view";
+import { ClosedSummary } from "./closed-view";
 import { AddressRequest } from "./address-request";
 import { ParkedBanner } from "./parked-banner";
 import type { Address } from "@/lib/address";
@@ -121,7 +121,11 @@ export function TicketFrame({
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <Dossier data={dossier} editable={editable} canComment />
-        {closed ? <ClosedView number={t.number} rows={closed} canReopen={isAdminOf(user.grants, t.workspace_id)} /> : <StepRail steps={steps} current={currentExtras}>{children}</StepRail>}
+        {closed ? (
+          <StepRail steps={steps} header={<ClosedSummary number={t.number} rows={closed} canReopen={isAdminOf(user.grants, t.workspace_id)} />} />
+        ) : (
+          <StepRail steps={steps} current={currentExtras}>{children}</StepRail>
+        )}
       </div>
     </>
   );

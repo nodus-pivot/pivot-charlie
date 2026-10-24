@@ -72,8 +72,10 @@ export function stepSummary(t: SummaryInput, stage: Step): string | null {
     }
     case "payment":
       return t.payment_amount != null ? `$${t.payment_amount.toFixed(0)} · paid` : "paid";
-    case "ship":
-      return [t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || "shipped";
+    case "ship": {
+      const emailed = t.messages.some((m) => m.channel === "email" && m.kind === "shipped");
+      return [[t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || "shipped", emailed ? "email sent" : null].filter(Boolean).join(" · ");
+    }
   }
 }
 
@@ -131,22 +133,21 @@ export function closedRows(
   const s = (stage: Step) => stepOf(t, stage);
   const rows: ClosedRow[] = [];
 
-  rows.push({ label: "Reported", text: [t.issue, t.source === "sheet" ? "from the website" : "by hand"].filter(Boolean).join(" · ") });
-  rows.push({ label: "Checked in", text: [d(s("check_in")?.done_at), t.check_in_by].filter(Boolean).join(" · ") || "—" });
+  rows.push({ label: "Reported", text: [t.issue, t.source === "sheet" ? "from the website" : "by hand", t.check_in_by ? `checked in ${d(s("check_in")?.done_at)} by ${t.check_in_by}` : null].filter(Boolean).join(" · ") });
   const ins = s("inspect");
-  rows.push({ label: "Found", text: [d(ins?.done_at), ins?.answer === false ? "Nothing wrong" : ins?.answer ? "Issue present" : null, ins?.notes].filter(Boolean).join(" · ") || "—" });
+  rows.push({ label: "Found", text: [ins?.answer === false ? "Could not replicate the issue" : ins?.answer ? "Issue present" : null, ins?.notes].filter(Boolean).join(" · ") || "—" });
   const sup = s("supply");
-  rows.push({ label: "Parts", text: sup?.skipped ? "none · nothing wrong" : sup?.answer ? "had parts in hand" : sup?.answer === false ? [partsPhrase(sup.notes) ?? "parts requested", sup.done_at ? `received ${d(sup.done_at)}` : null].filter(Boolean).join(" · ") : "—" });
+  rows.push({ label: "Parts", text: sup?.skipped ? "None · nothing wrong" : sup?.answer ? "Had on bench" : sup?.answer === false ? [partsPhrase(sup.notes) ?? "parts requested", sup.done_at ? `received ${d(sup.done_at)}` : null].filter(Boolean).join(" · ") : "—" });
   const rep = s("repair");
-  rows.push({ label: "Repaired", text: rep?.skipped ? "nothing to repair" : [d(rep?.done_at), rep?.notes, t.coverage].filter(Boolean).join(" · ") || "—" });
+  rows.push({ label: "Repaired", text: rep?.skipped ? "Nothing to repair" : [rep?.notes, d(rep?.done_at)].filter(Boolean).join(" · ") || "—" });
   const attempts = Math.max(1, ...t.tests.map((x) => x.attempt));
   const tst = s("test");
-  rows.push({ label: "Tested", text: tst?.skipped ? "skipped" : [d(tst?.done_at), `${Object.values(TEST_LABELS).join(" · ")} all passed`, attempts > 1 ? `on attempt ${attempts}` : null].filter(Boolean).join(" · ") });
+  rows.push({ label: "Tested", text: tst?.skipped ? "Skipped · nothing wrong" : [`${Object.values(TEST_LABELS).map((l, i) => (i ? l.toLowerCase() : l)).join(", ")} · all pass`, attempts > 1 ? `on attempt ${attempts}` : null].filter(Boolean).join(" · ") });
   const pay = s("payment");
-  rows.push({ label: "Payment", text: pay?.skipped || !t.needs_payment ? "Not required · warranty" : [t.payment_amount != null ? `$${t.payment_amount.toFixed(2)}` : null, pay?.answer ? `paid ${d(pay.done_at) ?? ""}`.trim() : "not paid · shipped on override"].filter(Boolean).join(" · ") });
+  rows.push({ label: "Payment", text: pay?.skipped || !t.needs_payment ? "Not required · warranty" : [t.payment_amount != null ? `$${t.payment_amount.toFixed(2)}` : null, pay?.answer ? `paid ${d(pay.done_at) ?? ""}`.trim() : "not paid · shipped on an owner override"].filter(Boolean).join(" · ") });
   const shipped = s("ship");
   const emailed = t.messages.some((m) => m.channel === "email" && m.kind === "shipped");
-  rows.push({ label: "Shipped", text: [d(shipped?.done_at), [t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || null, emailed ? "email logged" : null].filter(Boolean).join(" · ") || "—" });
+  rows.push({ label: "Shipped", text: [d(shipped?.done_at), [t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || null, emailed ? "customer emailed" : null].filter(Boolean).join(" · ") || "—" });
   return rows;
 }
 
