@@ -735,7 +735,8 @@ select
   case when rep.skipped then 'nothing wrong' else nullif(trim(rep.notes), '') end as outcome,
   lm.reply_count as slack_replies,
   lm.kind as slack_kind,
-  (select ph.storage_path from ticket_photos ph where ph.ticket_id = t.id order by (ph.kind = 'bench') desc, ph.sort, ph.created_at limit 1) as bench_photo_path
+  (select ph.storage_path from ticket_photos ph where ph.ticket_id = t.id order by (ph.kind = 'bench') desc, ph.sort, ph.created_at limit 1) as bench_photo_path,
+  (select p.display_name from ticket_steps sh join profiles p on p.id = sh.done_by where sh.ticket_id = t.id and sh.stage = 'ship') as shipped_by
 from tickets t
 left join ticket_steps ci on ci.ticket_id = t.id and ci.stage = 'check_in'
 left join ticket_steps ins on ins.ticket_id = t.id and ins.stage = 'inspect'

@@ -6,7 +6,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { STAGE_LABELS } from "@/features/pipeline";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { AGE_BAR_MAX_DAYS, BENCH_FILTERS, CLOSED_FILTERS, type Bench, type BenchFilter, type BenchGroup, type BenchSort, type BenchTicket, type ClosedFilter } from "../bench";
+import { AGE_BAR_MAX_DAYS, BENCH_FILTERS, CLOSED_FILTERS, closedOutcome, type Bench, type BenchFilter, type BenchGroup, type BenchSort, type BenchTicket, type ClosedFilter } from "../bench";
 
 type Props = {
   bench: Bench;
@@ -67,15 +67,17 @@ export function BenchView({ bench, view, filter, closedFilter, closedGroups, clo
               className="w-28 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-2 focus-visible:outline-none sm:w-40"
             />
           </label>
-          <select
-            name="sort"
-            defaultValue={sort}
-            aria-label="Sort"
-            className="h-[34px] border border-border-strong bg-transparent px-3 text-[13px] text-ink-2 outline-none focus:border-gold [&>option]:bg-panel"
-          >
-            <option value="oldest">Oldest first</option>
-            <option value="newest">Newest first</option>
-          </select>
+          {!closed ? (
+            <select
+              name="sort"
+              defaultValue={sort}
+              aria-label="Sort"
+              className="h-[34px] border border-border-strong bg-transparent px-3 text-[13px] text-ink-2 outline-none focus:border-gold [&>option]:bg-panel"
+            >
+              <option value="oldest">Oldest first</option>
+              <option value="newest">Newest first</option>
+            </select>
+          ) : null}
           <button type="submit" className={buttonClasses("secondary", "sm")}>Go</button>
         </form>
       </div>
@@ -130,14 +132,17 @@ function Row({ t, closed }: { t: BenchTicket; closed: boolean }) {
         {t.tag && !closed ? <span className={cn("text-[12.5px]", t.tag.tone === "amber" ? "text-amber" : t.tag.tone === "coral" ? "text-coral" : "text-gold-light")}>{t.tag.text}</span> : null}
         <span className="text-[12.5px] text-ink-3">
           {t.watch} · <span className="font-mono">{t.number}</span>
-          {closed && t.outcome ? ` · ${t.outcome}` : ""}
-          {closed && t.closed_at ? ` · ${formatDate(t.closed_at)}` : ""}
+          {closed && closedOutcome(t) ? ` · ${closedOutcome(t)}` : ""}
         </span>
       </div>
-      <span className="hidden text-xs uppercase tracking-label text-ink-2 lg:block">{closed ? "Closed" : `${STAGE_LABELS[t.stage]}${t.progress ? ` · ${t.progress}` : ""}`}</span>
       {closed ? (
-        <span className="hidden lg:block" />
+        <span className="hidden text-[13px] text-ink-3 lg:col-span-2 lg:block">
+          {formatDate(t.closed_at)}{t.shipped_by ? ` · ${t.shipped_by.split(/\s+/)[0]}` : ""}
+        </span>
       ) : (
+        <span className="hidden text-xs uppercase tracking-label text-ink-2 lg:block">{`${STAGE_LABELS[t.stage]}${t.progress ? ` · ${t.progress}` : ""}`}</span>
+      )}
+      {closed ? null : (
         <span className={cn("hidden items-center gap-2 font-mono text-xs lg:inline-flex", t.attention ? "text-amber" : "text-ink-2")}>
           <span className="h-1 w-[60px] overflow-hidden bg-rule">
             <span className={cn("block h-full", barTone)} style={{ width: `${pct}%` }} />

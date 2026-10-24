@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Grant } from "@/features/pipeline";
-import { buildBench, buildClosed, nextAction, type BenchRow } from "./bench";
+import { buildBench, buildClosed, closedOutcome, nextAction, type BenchRow } from "./bench";
 
 const WS = "ws";
 const BRAND = "brand";
@@ -33,6 +33,8 @@ function row(over: Partial<BenchRow> & { number: string; stage: BenchRow["stage"
     tests_passed: 0,
     ship_ready: false,
     outcome: null,
+    shipped_by: null,
+    received_at: null,
     slack_replies: null,
     bench_photo_path: null,
     tests_left: [],
@@ -88,10 +90,11 @@ describe("buildBench", () => {
     expect(by.NW260009).toEqual({ text: "Cannot replicate · Slack 1 reply", tone: "coral" });
     expect(by.NW260005).toEqual({ text: "$180 · invoice sent Oct 11", tone: "gold" });
     expect(by.NW260006).toBeNull();
+    expect(by.NW260004).toEqual({ text: "Priority", tone: "coral" });
   });
 
   it("filter counts match the chips", () => {
-    expect(bench.counts).toEqual({ all: 9, needs_me: 7, parked: 2, priority: 1, payment: 1, over_14: 1 });
+    expect(bench.counts).toEqual({ all: 9, needs_me: 7, parked: 2, priority: 1, payment: 1 });
   });
 
   it("filters, searches and sorts", () => {
@@ -119,5 +122,9 @@ describe("buildClosed", () => {
     expect(c.groups.map((g) => `${g.label}:${g.count}`)).toEqual(["September 2026:3", "August 2026:1"]);
     expect(c.groups[0].tickets.map((t) => t.number)).toEqual(["NW260019", "NW260008", "NW260007"]);
     expect(c.counts).toEqual({ all: 4, warranty: 3, paid: 1, nothing_wrong: 1 });
+    expect(c.stats.thisYear).toBe(4);
+  });
+  it("words the outcome like D13", () => {
+    expect(closed.map(closedOutcome)).toEqual(["clasp replaced", "paid · crystal replaced", "nothing wrong · returned", "demagnetised"]);
   });
 });

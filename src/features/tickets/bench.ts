@@ -33,6 +33,8 @@ export type BenchRow = {
   tests_passed: number;
   ship_ready: boolean;
   outcome: string | null;
+  shipped_by: string | null;
+  received_at: string | null;
   slack_replies: number | null;
   bench_photo_path: string | null;
   /** Test kinds without a pass in the current attempt. Empty outside Test. */
@@ -42,14 +44,13 @@ export type BenchRow = {
 export const ATTENTION_DAYS = 14;
 export const AGE_BAR_MAX_DAYS = 30;
 
-export type BenchFilter = "all" | "needs_me" | "parked" | "priority" | "payment" | "over_14";
+export type BenchFilter = "all" | "needs_me" | "parked" | "priority" | "payment";
 export const BENCH_FILTERS: { key: BenchFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "needs_me", label: "Needs me" },
   { key: "parked", label: "Parked" },
   { key: "priority", label: "Priority" },
   { key: "payment", label: "Payment" },
-  { key: "over_14", label: "Over 14 days" },
 ];
 
 export type BenchSort = "oldest" | "newest";
@@ -120,6 +121,7 @@ export function rowTag(t: BenchRow, now: Date): BenchTicket["tag"] {
   if (t.waiting_for_parts) return { text: `Waiting on parts · asked ${formatDate(t.parts_requested_at, now)}`, tone: "amber" };
   if (t.parked) return { text: `Cannot replicate${t.slack_replies ? ` · Slack ${t.slack_replies} repl${t.slack_replies === 1 ? "y" : "ies"}` : ""}`, tone: "coral" };
   if (t.awaiting_payment) return { text: [t.payment_amount != null ? `$${t.payment_amount.toFixed(0)}` : null, t.invoice_sent_at ? `invoice sent ${formatDate(t.invoice_sent_at, now)}` : "invoice not sent"].filter(Boolean).join(" · "), tone: "gold" };
+  if (t.priority && t.stage !== "closed") return { text: "Priority", tone: "coral" };
   return null;
 }
 
@@ -153,8 +155,6 @@ function matches(t: BenchTicket, filter: BenchFilter): boolean {
       return t.priority;
     case "payment":
       return t.stage === "payment" || (t.needs_payment && !t.payment_received && t.stage !== "closed");
-    case "over_14":
-      return t.attention;
   }
 }
 
@@ -225,6 +225,23 @@ export const CLOSED_FILTERS: { key: ClosedFilter; label: string }[] = [
 
 const monthFmt = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/Los_Angeles" });
 
+/** "paid · crystal replaced" / "nothing wrong · returned": the one-line outcome on a closed row. */
+export function closedOutcome(t: BenchRow): string {
+  const work = t.outcome === "nothing wrong" ? "nothing wrong · returned" : t.outcome ? t.outcome.split(/[.;\n]/)[0].trim().replace(/^./, (c) => c.toLowerCase()) : null;
+  return [t.needs_payment ? "paid" : null, work].filter(Boolean).join(" · ");
+}
+
+export type ClosedStats = { thisYear: number; avgDays: number | null };
+
+/** "7 this year · avg 11 days bench to ship", from received to closed. */
+export function closedStats(rows: BenchRow[], now: Date = new Date()): ClosedStats {
+  const year = now.getFullYear();
+  const thisYear = rows.filter((t) => t.closed_at && new Date(t.closed_at).getFullYear() === year).length;
+  const spans = rows.filter((t) => t.closed_at && t.received_at).map((t) => (new Date(t.closed_at!).getTime() - new Date(t.received_at!).getTime()) / 86_400_000);
+  const avgDays = spans.length ? Math.round(spans.reduce((a, b) => a + b, 0) / spans.length) : null;
+  return { thisYear, avgDays };
+}
+
 export function closedMatches(t: BenchRow, filter: ClosedFilter): boolean {
   switch (filter) {
     case "all":
@@ -238,7 +255,7 @@ export function closedMatches(t: BenchRow, filter: ClosedFilter): boolean {
   }
 }
 
-export function buildClosed(rows: BenchRow[], grants: Grant[], opts: { filter: ClosedFilter; query: string; now?: Date }): { groups: BenchGroup[]; counts: Record<ClosedFilter, number>; total: number } {
+export function buildClosed(rows: BenchRow[], grants: Grant[], opts: { filter: ClosedFilter; query: string; now?: Date }): { groups: BenchGroup[]; counts: Record<ClosedFilter, number>; total: number; stats: ClosedStats } {
   const now = opts.now ?? new Date();
   const all = decorate(rows, grants, now);
   const counts = Object.fromEntries(CLOSED_FILTERS.map((f) => [f.key, all.filter((t) => closedMatches(t, f.key)).length])) as Record<ClosedFilter, number>;
@@ -252,5 +269,5 @@ export function buildClosed(rows: BenchRow[], grants: Grant[], opts: { filter: C
       g.count++;
     } else groups.push({ key: label, label, count: 1, tickets: [t] });
   }
-  return { groups, counts, total: all.length };
+  return { groups, counts, total: all.length, stats: closedStats(rows, now) };
 }

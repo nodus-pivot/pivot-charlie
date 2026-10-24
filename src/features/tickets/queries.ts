@@ -52,6 +52,8 @@ export async function listBench(workspaceId: string, view: "open" | "closed"): P
     tests_passed: r.tests_passed ?? 0,
     ship_ready: !!r.ship_ready,
     outcome: r.outcome,
+    shipped_by: r.shipped_by,
+    received_at: r.received_at,
     slack_replies: r.slack_replies,
     bench_photo_path: r.bench_photo_path,
     tests_left: r.stage === "test" ? (TEST_KINDS.filter((k) => !(passedBy.get(r.id!) ?? new Set()).has(k)) as TestKind[]) : [],

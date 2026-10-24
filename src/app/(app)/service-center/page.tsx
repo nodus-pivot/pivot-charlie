@@ -13,7 +13,7 @@ import { getVisibleBrands, getWorkspaceContext } from "@/features/workspaces/que
 
 export const metadata: Metadata = { title: "My bench" };
 
-const FILTERS: BenchFilter[] = ["all", "needs_me", "parked", "priority", "payment", "over_14"];
+const FILTERS: BenchFilter[] = ["all", "needs_me", "parked", "priority", "payment"];
 
 function one(v: string | string[] | undefined): string {
   return Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
@@ -55,6 +55,7 @@ export default async function ServiceCenterPage({ searchParams }: PageProps<"/se
       <PageBand
         eyebrow={`${ws.current.name} · ${first}`}
         title={view === "closed" ? "Closed" : "My bench"}
+        aside={closedList ? <span className="text-base text-ink-2">{closedList.stats.thisYear} this year{closedList.stats.avgDays != null ? ` · avg ${closedList.stats.avgDays} days bench to ship` : ""}</span> : undefined}
         action={
           <ButtonLink href="/service-center/tickets/new" variant="primary">
             New ticket

@@ -734,6 +734,7 @@ export type Database = {
           received_at: string | null
           return_to_everett: boolean | null
           ship_ready: boolean | null
+          shipped_by: string | null
           slack_kind: Database["public"]["Enums"]["message_kind"] | null
           slack_replies: number | null
           source: Database["public"]["Enums"]["ticket_source"] | null
