@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * The row under every open step: the primary "<Done> → <Next>" button at
- * 60% while blocked with "N left: <reason>" beside it, any extra actions,
- * and "Back to <previous>" on the right.
+ * The row under every open step. "Back to <previous>" on the left; on the
+ * right, in reading order, "N left: <reason>", any extra forward action
+ * (skip to Ship, owner override) and the primary "<Done> → <Next>" button
+ * at 60% while blocked. Forward is always on the right.
  */
 export function StepActions({
   label,
@@ -62,8 +63,8 @@ export function StepActions({
         </button>
       ) : null}
       <div className="ml-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2">
-        {extra}
         {status}
+        {extra}
         <Button variant="primary" disabled={disabled} onClick={onPrimary} className={cn("shrink-0", disabled && !pending && "opacity-60")}>
           {pending ? "Saving…" : label}
           {next ? (

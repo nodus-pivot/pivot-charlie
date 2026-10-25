@@ -62,6 +62,11 @@ export async function fetchInvoice(id: string): Promise<InvoiceLookup> {
   return { status: "open", paidAt: null };
 }
 
+/** Void an open invoice: the hosted pay link stops working. Paid invoices cannot be voided (that is a refund). */
+export async function voidStripeInvoice(id: string): Promise<void> {
+  await client().invoices.voidInvoice(id);
+}
+
 /** Error text safe to store on the row and show to nobody: codes, not secrets. */
 export function stripeError(e: unknown): string {
   if (e instanceof Stripe.errors.StripeError) return [e.type, e.code, e.message].filter(Boolean).join(" · ").slice(0, 500);

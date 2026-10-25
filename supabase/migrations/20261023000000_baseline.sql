@@ -226,6 +226,7 @@ create table ticket_invoices (
   created_at timestamptz not null default now(),
   due_at timestamptz not null,
   paid_at timestamptz,
+  voided_at timestamptz,
   checked_at timestamptz,
   error text,
   created_by uuid references profiles(id)

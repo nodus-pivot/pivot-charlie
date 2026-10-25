@@ -9,7 +9,7 @@ import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
 import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
-import { createInvoice, findOrCreateCustomer, stripeConfigured, stripeError } from "@/lib/stripe";
+import { createInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -420,6 +420,28 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
   });
   if (error) return { ok: false, error: message(error) };
   await logEmail(t, "invoice", { url: created.url, amount: ticket.payment_amount });
+  refresh(ticketNumber);
+  return { ok: true };
+}
+
+/** Void the open invoice at Stripe and here. The amount unlocks and "Send a new invoice" appears. */
+export async function voidInvoice(ticketNumber: string): Promise<ActionResult> {
+  const t = await loadForStep(ticketNumber, "payment");
+  if (!t.ok) return t;
+  if (!stripeConfigured()) return { ok: false, error: "Stripe isn't set up on this server yet." };
+  const { data: open } = await t.supabase.from("ticket_invoices").select("id, stripe_invoice_id").eq("ticket_id", t.id).eq("status", "open").maybeSingle();
+  if (!open) return { ok: false, error: "There's no open invoice to void. Reload." };
+  if (!open.stripe_invoice_id.startsWith("in_seed")) {
+    try {
+      await voidStripeInvoice(open.stripe_invoice_id);
+    } catch (e) {
+      return { ok: false, error: `Stripe refused: ${stripeError(e)}` };
+    }
+  }
+  const now = new Date().toISOString();
+  const { error } = await t.supabase.from("ticket_invoices").update({ status: "void", voided_at: now, checked_at: now, error: null }).eq("id", open.id);
+  if (error) return { ok: false, error: message(error) };
+  await t.supabase.from("ticket_events").insert({ ticket_id: t.id, type: "invoice_voided", actor_id: t.userId, body: "Invoice voided" });
   refresh(ticketNumber);
   return { ok: true };
 }

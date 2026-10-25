@@ -66,7 +66,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         needsPayment={t.needs_payment}
         issue={t.issue}
         inspectNotes={stepOf(detail, "inspect")?.notes ?? null}
-        payment={{ amount: t.payment_amount, invoice: invoice ? { status: invoice.status, url: invoice.hosted_url, sentAt: invoice.created_at, dueAt: invoice.due_at, paidAt: invoice.paid_at, dueText: dueText(invoice.due_at) } : null }}
+        payment={{ amount: t.payment_amount, invoice: invoice ? { status: invoice.status, url: invoice.hosted_url, sentAt: invoice.created_at, dueAt: invoice.due_at, paidAt: invoice.paid_at, voidedAt: invoice.voided_at, dueText: dueText(invoice.due_at) } : null }}
         tests={{
           attempt: t.test_attempt,
           passed: detail.tests.filter((x) => x.attempt === t.test_attempt && x.result === "pass").map((x) => x.kind as TestKind),

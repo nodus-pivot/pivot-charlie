@@ -322,6 +322,7 @@ export type Database = {
           stripe_customer_id: string
           stripe_invoice_id: string
           ticket_id: string
+          voided_at: string | null
         }
         Insert: {
           amount: number
@@ -337,6 +338,7 @@ export type Database = {
           stripe_customer_id: string
           stripe_invoice_id: string
           ticket_id: string
+          voided_at?: string | null
         }
         Update: {
           amount?: number
@@ -352,6 +354,7 @@ export type Database = {
           stripe_customer_id?: string
           stripe_invoice_id?: string
           ticket_id?: string
+          voided_at?: string | null
         }
         Relationships: [
           {

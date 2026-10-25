@@ -9,7 +9,7 @@ import { ChoicePair } from "@/components/ui/choice-pair";
 import { STAGE_LABELS, TEST_KINDS, TEST_LABELS, nextStage, type Step, type TestKind } from "@/features/pipeline";
 import { formatDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, sendInvoice, setPartsReceived, setPaymentAmount, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip, updateShipTo } from "../actions";
+import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, sendInvoice, setPartsReceived, setPaymentAmount, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip, updateShipTo, voidInvoice } from "../actions";
 import { SlackCard, parseSlackBody } from "./slack-card";
 import { StepActions } from "./step-actions";
 import { TestRows } from "./test-rows";
@@ -322,6 +322,7 @@ export function StepForm(p: StepFormProps) {
           onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPaymentAmount(p.number, amount ? Number(amount) : null))}
           invoice={p.payment.invoice}
           onSendInvoice={() => run(() => sendInvoice(p.number))}
+          onVoidInvoice={() => run(() => voidInvoice(p.number))}
           paid={!!answer}
           onPaidToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }}
           disabled={!p.canAct || pending}

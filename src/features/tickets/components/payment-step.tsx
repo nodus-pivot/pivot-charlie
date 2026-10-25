@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowSquareOut, CheckCircle, Clock, Copy, CurrencyDollar, Receipt, WarningCircle } from "@phosphor-icons/react";
+import { ArrowSquareOut, CheckCircle, Clock, Copy, CurrencyDollar, Prohibit, Receipt, WarningCircle } from "@phosphor-icons/react";
 import { BigTick } from "@/components/ui/big-tick";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ export type InvoiceView = {
   sentAt: string;
   dueAt: string;
   paidAt: string | null;
+  voidedAt: string | null;
   /** "due in 6 days" · "due today" · "2 days overdue", worked out when the page rendered. */
   dueText: string;
 };
@@ -19,7 +20,8 @@ export type InvoiceView = {
 /**
  * D6: three cards (cost · invoice · status) and the Payment received tick.
  * The cost is typed in place; the invoice card sends a Stripe invoice and
- * then shows when it went out, when it is due and the pay link to copy.
+ * then shows when it went out, when it is due, the pay link to copy, and
+ * Void. A voided or expired invoice unlocks the cost and offers a new one.
  */
 export function PaymentStep({
   amount,
@@ -27,6 +29,7 @@ export function PaymentStep({
   onAmountBlur,
   invoice,
   onSendInvoice,
+  onVoidInvoice,
   paid,
   onPaidToggle,
   disabled,
@@ -37,6 +40,7 @@ export function PaymentStep({
   /** The open invoice, else the newest one; null before the first is sent. */
   invoice: InvoiceView | null;
   onSendInvoice: () => void;
+  onVoidInvoice: () => void;
   paid: boolean;
   onPaidToggle: () => void;
   disabled: boolean;
@@ -64,7 +68,7 @@ export function PaymentStep({
         </Card>
         <Card label="Invoice">
           {active ? (
-            <InvoiceLine invoice={active} />
+            <InvoiceLine invoice={active} onVoid={active.status === "open" ? onVoidInvoice : null} disabled={disabled} />
           ) : (
             <button type="button" disabled={!canSend} onClick={onSendInvoice} className="flex items-center gap-2 text-left text-[16px] text-ink transition-colors hover:text-gold-light disabled:cursor-default disabled:text-ink-3 disabled:hover:text-ink-3">
               <Receipt size={16} className="shrink-0" aria-hidden />
@@ -81,8 +85,9 @@ export function PaymentStep({
   );
 }
 
-function InvoiceLine({ invoice }: { invoice: InvoiceView }) {
+function InvoiceLine({ invoice, onVoid, disabled }: { invoice: InvoiceView; onVoid: (() => void) | null; disabled: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   async function copy() {
     try {
       await navigator.clipboard.writeText(invoice.url);
@@ -98,14 +103,27 @@ function InvoiceLine({ invoice }: { invoice: InvoiceView }) {
         <Receipt size={16} className="shrink-0 text-gold" aria-hidden />
         <span className="truncate">Sent {formatDate(invoice.sentAt)} · {invoice.status === "paid" ? `paid ${formatDate(invoice.paidAt ?? invoice.sentAt)}` : `due ${formatDate(invoice.dueAt)}`}</span>
       </span>
-      <span className="flex items-center gap-3 text-[12px] text-ink-3">
-        <button type="button" onClick={copy} className="inline-flex items-center gap-1 transition-colors hover:text-ink">
-          <Copy size={12} aria-hidden /> {copied ? "Copied" : "Copy pay link"}
-        </button>
-        <a href={invoice.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition-colors hover:text-ink">
-          <ArrowSquareOut size={12} aria-hidden /> Open
-        </a>
-      </span>
+      {confirming ? (
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-2">
+          <span>Void this invoice? The pay link stops working.</span>
+          <button type="button" disabled={disabled} onClick={() => { setConfirming(false); onVoid?.(); }} className="font-medium text-coral transition-colors hover:text-ink disabled:opacity-60">Void</button>
+          <button type="button" onClick={() => setConfirming(false)} className="transition-colors hover:text-ink">Keep</button>
+        </span>
+      ) : (
+        <span className="flex items-center gap-3 text-[12px] text-ink-3">
+          <button type="button" onClick={copy} className="inline-flex items-center gap-1 transition-colors hover:text-ink">
+            <Copy size={12} aria-hidden /> {copied ? "Copied" : "Copy pay link"}
+          </button>
+          <a href={invoice.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition-colors hover:text-ink">
+            <ArrowSquareOut size={12} aria-hidden /> Open
+          </a>
+          {onVoid ? (
+            <button type="button" disabled={disabled} onClick={() => setConfirming(true)} className="inline-flex items-center gap-1 transition-colors hover:text-coral disabled:opacity-60">
+              <Prohibit size={12} aria-hidden /> Void
+            </button>
+          ) : null}
+        </span>
+      )}
     </span>
   );
 }
@@ -131,7 +149,7 @@ function StatusLine({ paid, invoice }: { paid: boolean; invoice: InvoiceView | n
     return (
       <>
         <WarningCircle size={16} className="shrink-0 text-coral" aria-hidden />
-        <span className="text-coral">{invoice.status === "expired" ? `Expired ${formatDate(invoice.dueAt)} · send a new one` : "Voided in Stripe"}</span>
+        <span className="text-coral">{invoice.status === "expired" ? `Expired ${formatDate(invoice.dueAt)}` : `Voided${invoice.voidedAt ? ` ${formatDate(invoice.voidedAt)}` : ""}`} · send a new one</span>
       </>
     );
   }

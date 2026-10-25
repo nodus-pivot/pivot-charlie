@@ -131,7 +131,7 @@ async function syncInvoices(supabase: Awaited<ReturnType<typeof createClient>>, 
     try {
       const r = await fetchInvoice(open.stripe_invoice_id);
       if (r.status === "paid") patch = { status: "paid", paid_at: r.paidAt, checked_at: checked, error: null };
-      else if (r.status === "void") patch = { status: "void", checked_at: checked, error: null };
+      else if (r.status === "void") patch = { status: "void", voided_at: checked, checked_at: checked, error: null };
       else if (new Date(open.due_at).getTime() < now) patch = { status: "expired", checked_at: checked, error: null };
       else patch = { checked_at: checked, error: null };
     } catch (e) {
