@@ -9,7 +9,7 @@ import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
 import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
-import { createInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
+import { createInvoice, fetchInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -435,7 +435,9 @@ export async function voidInvoice(ticketNumber: string): Promise<ActionResult> {
     try {
       await voidStripeInvoice(open.stripe_invoice_id);
     } catch (e) {
-      return { ok: false, error: `Stripe refused: ${stripeError(e)}` };
+      // Already void at Stripe (voided from the dashboard, or a retry): just record it.
+      const now = await fetchInvoice(open.stripe_invoice_id).catch(() => null);
+      if (now?.status !== "void") return { ok: false, error: `Stripe refused: ${stripeError(e)}` };
     }
   }
   const now = new Date().toISOString();
