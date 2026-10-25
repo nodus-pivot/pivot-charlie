@@ -9,12 +9,12 @@ import { ChoicePair } from "@/components/ui/choice-pair";
 import { STAGE_LABELS, TEST_KINDS, TEST_LABELS, nextStage, type Step, type TestKind } from "@/features/pipeline";
 import { formatDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, setPartsReceived, setPayment, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip, updateShipTo } from "../actions";
+import { advanceTicket, clearTest, failTest, passTest, postToSlack, saveShipping, sendBack, sendInvoice, setPartsReceived, setPaymentAmount, setPaymentReceived, setStepAnswer, setStepNotes, skipToShip, updateShipTo } from "../actions";
 import { SlackCard, parseSlackBody } from "./slack-card";
 import { StepActions } from "./step-actions";
 import { TestRows } from "./test-rows";
 import { PhotoStrip } from "./photo-strip";
-import { PaymentStep } from "./payment-step";
+import { PaymentStep, type InvoiceView } from "./payment-step";
 import { ShipStep } from "./ship-step";
 import type { Address } from "@/lib/address";
 
@@ -41,7 +41,7 @@ export type StepFormProps = {
   inspectNotes: string | null;
   customer: string;
   watch: string;
-  payment: { amount: number | null; invoiceSentAt: string | null };
+  payment: { amount: number | null; invoice: InvoiceView | null };
   tests: { attempt: number; passed: TestKind[]; previousFails: { attempt: number; kind: TestKind; note: string | null }[] };
   ship: { carrier: string; tracking: string; labelUrl: string; shipTo: Address | null; everett: boolean; email: string | null; shippedEmailAt: string | null };
   slackChannel: string | null;
@@ -79,7 +79,6 @@ export function StepForm(p: StepFormProps) {
   const [failing, setFailing] = useState<TestKind | null>(null);
   const [failNote, setFailNote] = useState("");
   const [amount, setAmount] = useState(p.payment.amount?.toString() ?? "");
-  const [invoiceSent, setInvoiceSent] = useState(!!p.payment.invoiceSentAt);
   const [ship, setShip] = useState({ carrier: p.ship.carrier, tracking: p.ship.tracking, labelUrl: p.ship.labelUrl });
   const [tickedAt, setTickedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -320,10 +319,9 @@ export function StepForm(p: StepFormProps) {
         <PaymentStep
           amount={amount}
           onAmount={setAmount}
-          onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPayment(p.number, { amount: amount ? Number(amount) : null, invoiceSent }))}
-          invoiceSent={invoiceSent}
-          invoiceSentAt={p.payment.invoiceSentAt}
-          onInvoiceToggle={() => { const v = !invoiceSent; setInvoiceSent(v); run(() => setPayment(p.number, { amount: amount ? Number(amount) : null, invoiceSent: v })); }}
+          onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPaymentAmount(p.number, amount ? Number(amount) : null))}
+          invoice={p.payment.invoice}
+          onSendInvoice={() => run(() => sendInvoice(p.number))}
           paid={!!answer}
           onPaidToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }}
           disabled={!p.canAct || pending}

@@ -39,6 +39,8 @@ export async function listBench(workspaceId: string, view: "open" | "closed"): P
     needs_payment: !!r.needs_payment,
     payment_amount: r.payment_amount,
     invoice_sent_at: r.invoice_sent_at,
+    invoice_status: r.invoice_status,
+    invoice_due_at: r.invoice_due_at,
     payment_received: !!r.payment_received,
     return_to_everett: !!r.return_to_everett,
     coverage: r.coverage,

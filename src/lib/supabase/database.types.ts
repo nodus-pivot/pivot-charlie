@@ -307,6 +307,76 @@ export type Database = {
           },
         ]
       }
+      ticket_invoices: {
+        Row: {
+          amount: number
+          checked_at: string | null
+          created_at: string
+          created_by: string | null
+          due_at: string
+          error: string | null
+          hosted_url: string
+          id: string
+          paid_at: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          stripe_customer_id: string
+          stripe_invoice_id: string
+          ticket_id: string
+        }
+        Insert: {
+          amount: number
+          checked_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_at: string
+          error?: string | null
+          hosted_url: string
+          id?: string
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          stripe_customer_id: string
+          stripe_invoice_id: string
+          ticket_id: string
+        }
+        Update: {
+          amount?: number
+          checked_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_at?: string
+          error?: string | null
+          hosted_url?: string
+          id?: string
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          stripe_customer_id?: string
+          stripe_invoice_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_invoices_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_board"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_invoices_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_messages: {
         Row: {
           body: string
@@ -561,7 +631,6 @@ export type Database = {
           customer_name: string
           customer_phone: string | null
           id: string
-          invoice_sent_at: string | null
           issue: string | null
           label_url: string | null
           needs_payment: boolean
@@ -577,6 +646,7 @@ export type Database = {
           ship_tracking: string | null
           source: Database["public"]["Enums"]["ticket_source"]
           stage: Database["public"]["Enums"]["stage"]
+          stripe_customer_id: string | null
           test_attempt: number
           updated_at: string
           watch: string
@@ -594,7 +664,6 @@ export type Database = {
           customer_name: string
           customer_phone?: string | null
           id?: string
-          invoice_sent_at?: string | null
           issue?: string | null
           label_url?: string | null
           needs_payment?: boolean
@@ -610,6 +679,7 @@ export type Database = {
           ship_tracking?: string | null
           source?: Database["public"]["Enums"]["ticket_source"]
           stage?: Database["public"]["Enums"]["stage"]
+          stripe_customer_id?: string | null
           test_attempt?: number
           updated_at?: string
           watch: string
@@ -627,7 +697,6 @@ export type Database = {
           customer_name?: string
           customer_phone?: string | null
           id?: string
-          invoice_sent_at?: string | null
           issue?: string | null
           label_url?: string | null
           needs_payment?: boolean
@@ -643,6 +712,7 @@ export type Database = {
           ship_tracking?: string | null
           source?: Database["public"]["Enums"]["ticket_source"]
           stage?: Database["public"]["Enums"]["stage"]
+          stripe_customer_id?: string | null
           test_attempt?: number
           updated_at?: string
           watch?: string
@@ -724,7 +794,10 @@ export type Database = {
           created_at: string | null
           customer_name: string | null
           id: string | null
+          invoice_due_at: string | null
           invoice_sent_at: string | null
+          invoice_status: Database["public"]["Enums"]["invoice_status"] | null
+          invoice_url: string | null
           needs_payment: boolean | null
           number: string | null
           outcome: string | null
@@ -811,9 +884,15 @@ export type Database = {
     }
     Enums: {
       coverage: "warranty" | "paid"
+      invoice_status: "open" | "paid" | "void" | "expired"
       member_role: "owner" | "admin" | "brand_rep" | "watchmaker"
       message_channel: "slack" | "email"
-      message_kind: "parts_needed" | "cannot_replicate" | "received" | "shipped"
+      message_kind:
+        | "parts_needed"
+        | "cannot_replicate"
+        | "received"
+        | "shipped"
+        | "invoice"
       message_status: "logged" | "sent" | "failed"
       photo_kind: "customer" | "bench"
       sheet_row_status: "imported" | "dismissed"
@@ -958,9 +1037,16 @@ export const Constants = {
   public: {
     Enums: {
       coverage: ["warranty", "paid"],
+      invoice_status: ["open", "paid", "void", "expired"],
       member_role: ["owner", "admin", "brand_rep", "watchmaker"],
       message_channel: ["slack", "email"],
-      message_kind: ["parts_needed", "cannot_replicate", "received", "shipped"],
+      message_kind: [
+        "parts_needed",
+        "cannot_replicate",
+        "received",
+        "shipped",
+        "invoice",
+      ],
       message_status: ["logged", "sent", "failed"],
       photo_kind: ["customer", "bench"],
       sheet_row_status: ["imported", "dismissed"],

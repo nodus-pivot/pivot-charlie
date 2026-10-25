@@ -19,6 +19,15 @@ export async function generateMetadata({ params }: PageProps<"/service-center/ti
   return { title: number };
 }
 
+/** "due in 6 days" · "due tomorrow" · "due today" · "2 days overdue". */
+function dueText(dueAt: string): string {
+  const days = Math.ceil((new Date(dueAt).getTime() - Date.now()) / 86_400_000);
+  if (days > 1) return `due in ${days} days`;
+  if (days === 1) return "due tomorrow";
+  if (days === 0) return "due today";
+  return `${-days} day${days === -1 ? "" : "s"} overdue`;
+}
+
 /** The ticket page. The frame is shared; the open step's form renders under its title in the rail. */
 export default async function TicketPage({ params, searchParams }: PageProps<"/service-center/tickets/[number]">) {
   const [{ number }, sp, user, ws] = await Promise.all([params, searchParams, getCurrentUser(), getWorkspaceContext()]);
@@ -28,7 +37,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
   const t = detail.ticket;
   const canAct = canActOn(user.grants, t.stage, t.workspace_id, t.brand_id);
   // The step form keeps optimistic local state; remount it whenever the server data it started from changes.
-  const revision = [t.stage, t.updated_at, ...detail.steps.map((s) => `${s.answer}${s.done_at}`), detail.tests.map((x) => `${x.attempt}${x.kind}${x.result}`).join(","), detail.messages.length, detail.events.length].join("|");
+  const revision = [t.stage, t.updated_at, ...detail.steps.map((s) => `${s.answer}${s.done_at}`), detail.tests.map((x) => `${x.attempt}${x.kind}${x.result}`).join(","), detail.messages.length, detail.events.length, detail.invoices.map((i) => `${i.id}${i.status}`).join(",")].join("|");
 
   let step: React.ReactNode = null;
   if (t.stage !== "closed") {
@@ -40,6 +49,8 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
     // Back goes to the last step actually worked, never into a skipped one.
     const backTo = [...STEPS].slice(0, STEPS.indexOf(stage)).reverse().find((x) => !stepOf(detail, x)?.skipped) ?? null;
     const shippedEmail = detail.messages.find((m) => m.channel === "email" && m.kind === "shipped") ?? null;
+    // The open invoice, else the newest one (paid, expired or voided).
+    const invoice = detail.invoices.find((i) => i.status === "open") ?? detail.invoices[0] ?? null;
     const shipTo = t.return_to_everett ? (ws.current?.fulfillment_address as Address | null) : t.ship_to;
     step = (
       <StepForm
@@ -55,7 +66,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         needsPayment={t.needs_payment}
         issue={t.issue}
         inspectNotes={stepOf(detail, "inspect")?.notes ?? null}
-        payment={{ amount: t.payment_amount, invoiceSentAt: t.invoice_sent_at }}
+        payment={{ amount: t.payment_amount, invoice: invoice ? { status: invoice.status, url: invoice.hosted_url, sentAt: invoice.created_at, dueAt: invoice.due_at, paidAt: invoice.paid_at, dueText: dueText(invoice.due_at) } : null }}
         tests={{
           attempt: t.test_attempt,
           passed: detail.tests.filter((x) => x.attempt === t.test_attempt && x.result === "pass").map((x) => x.kind as TestKind),

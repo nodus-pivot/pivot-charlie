@@ -46,6 +46,8 @@ src/
   `ticket_steps`, never in columns on `tickets`. Parked, waiting for parts and awaiting payment
   are computed in the `ticket_board` view. Every Slack post and customer email is a
   `ticket_messages` row; emails stay `logged` until a mailer is switched on.
+- **Stripe invoices** are `ticket_invoices` rows written by `sendInvoice` through `lib/stripe.ts`; the
+  ticket page's loader (`detail.ts`) asks Stripe about the open one at most every two minutes. No webhook.
 - **The sheet is written in exactly three places**: move a row to the month tab (create), move a
   row to Archive (dismiss), and the write-back drainer that applies `sheet_writebacks`. All three
   live in `features/intake`. Nothing else imports the Sheets client.

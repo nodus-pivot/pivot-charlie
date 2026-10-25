@@ -21,8 +21,9 @@ create type photo_kind as enum ('customer', 'bench');
 create type sheet_row_status as enum ('imported', 'dismissed');
 create type writeback_status as enum ('pending', 'done', 'failed');
 create type message_channel as enum ('slack', 'email');
-create type message_kind as enum ('parts_needed', 'cannot_replicate', 'received', 'shipped');
+create type message_kind as enum ('parts_needed', 'cannot_replicate', 'received', 'shipped', 'invoice');
 create type message_status as enum ('logged', 'sent', 'failed');
+create type invoice_status as enum ('open', 'paid', 'void', 'expired');
 
 -- ================================================================ helpers
 create or replace function app.set_updated_at() returns trigger
@@ -141,7 +142,7 @@ create table tickets (
   priority boolean not null default false,
   needs_payment boolean not null default false,
   payment_amount numeric(10,2),
-  invoice_sent_at timestamptz,
+  stripe_customer_id text,
   return_to_everett boolean not null default false,
 
   test_attempt int not null default 1,
@@ -210,6 +211,27 @@ create table ticket_messages (
   created_at timestamptz not null default now()
 );
 create index ticket_messages_ticket on ticket_messages (ticket_id, created_at);
+
+-- Stripe invoices sent from the Payment step. One open invoice per ticket at
+-- a time; paid, void and expired are final and a new row replaces them. The
+-- ticket page asks Stripe for the open one's status when it loads.
+create table ticket_invoices (
+  id uuid primary key default gen_random_uuid(),
+  ticket_id uuid not null references tickets(id) on delete cascade,
+  stripe_customer_id text not null,
+  stripe_invoice_id text not null unique,
+  hosted_url text not null,
+  amount numeric(10,2) not null,
+  status invoice_status not null default 'open',
+  created_at timestamptz not null default now(),
+  due_at timestamptz not null,
+  paid_at timestamptz,
+  checked_at timestamptz,
+  error text,
+  created_by uuid references profiles(id)
+);
+create unique index one_open_invoice_per_ticket on ticket_invoices (ticket_id) where status = 'open';
+create index ticket_invoices_ticket on ticket_invoices (ticket_id, created_at);
 
 -- Time / Water / Looks per attempt. A Fail sends the ticket back to Repair and
 -- the next visit to Test starts a new attempt; earlier attempts stay.
@@ -479,6 +501,19 @@ end $$;
 create trigger ticket_steps_payment_writeback after update of answer on ticket_steps
   for each row execute function app.payment_step_writeback();
 
+-- A paid Stripe invoice ticks "Payment received" on the ticket.
+create or replace function app.invoice_paid_marks_step() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.status = 'paid' and old.status is distinct from 'paid' then
+    update ticket_steps set answer = true
+     where ticket_id = new.ticket_id and stage = 'payment' and answer is distinct from true;
+  end if;
+  return new;
+end $$;
+create trigger ticket_invoices_paid after update of status on ticket_invoices
+  for each row execute function app.invoice_paid_marks_step();
+
 -- ================================================================ stage machine
 -- Four doors to tickets.stage: advance, send_back, skip_to_ship, reopen.
 -- Scope, ownership and every gate live here; the UI only mirrors them.
@@ -721,7 +756,8 @@ end $$;
 create view ticket_board with (security_invoker = true) as
 select
   t.id, t.number, t.workspace_id, t.brand_id, t.stage, t.source,
-  t.customer_name, t.watch, t.priority, t.needs_payment, t.payment_amount, t.invoice_sent_at,
+  t.customer_name, t.watch, t.priority, t.needs_payment, t.payment_amount,
+  inv.created_at as invoice_sent_at, inv.status as invoice_status, inv.due_at as invoice_due_at, inv.hosted_url as invoice_url,
   t.return_to_everett, t.coverage, t.test_attempt, t.created_at, t.closed_at,
   ci.done_at as received_at,
   coalesce(e.entered_at, t.created_at) as stage_entered_at,
@@ -753,6 +789,11 @@ left join lateral (
    where m.ticket_id = t.id and m.channel = 'slack'
    order by m.created_at desc limit 1
 ) lm on true
+left join lateral (
+  select i.created_at, i.status, i.due_at, i.hosted_url from ticket_invoices i
+   where i.ticket_id = t.id
+   order by (i.status = 'open') desc, i.created_at desc limit 1
+) inv on true
 left join lateral (
   select ev.created_at as entered_at from ticket_events ev
    where ev.ticket_id = t.id and ev.to_stage = t.stage and ev.type in ('stage_changed', 'sent_back', 'skipped', 'reopened', 'created')
@@ -844,6 +885,7 @@ alter table sheet_rows enable row level security;
 alter table tickets enable row level security;
 alter table ticket_steps enable row level security;
 alter table ticket_messages enable row level security;
+alter table ticket_invoices enable row level security;
 alter table ticket_tests enable row level security;
 alter table ticket_photos enable row level security;
 alter table ticket_events enable row level security;
@@ -900,6 +942,13 @@ create policy ticket_messages_insert on ticket_messages for insert to authentica
 create policy ticket_messages_update on ticket_messages for update to authenticated
   using (app.ticket_in_scope(ticket_id)) with check (app.ticket_in_scope(ticket_id));
 
+create policy ticket_invoices_read on ticket_invoices for select to authenticated
+  using (app.ticket_in_scope(ticket_id));
+create policy ticket_invoices_insert on ticket_invoices for insert to authenticated
+  with check (app.ticket_in_scope(ticket_id) and created_by = auth.uid());
+create policy ticket_invoices_update on ticket_invoices for update to authenticated
+  using (app.ticket_in_scope(ticket_id)) with check (app.ticket_in_scope(ticket_id));
+
 create policy ticket_tests_all on ticket_tests for all to authenticated
   using (app.ticket_in_scope(ticket_id)) with check (app.ticket_in_scope(ticket_id));
 create policy ticket_photos_all on ticket_photos for all to authenticated
@@ -920,6 +969,7 @@ select app.grant_columns_except('tickets', 'update',
   array['stage', 'closed_at', 'number', 'workspace_id', 'brand_id', 'source', 'sheet_row_id', 'test_attempt', 'created_by', 'created_at', 'updated_at', 'search']);
 select app.grant_columns_except('ticket_steps', 'update', array['ticket_id', 'stage', 'skipped', 'updated_at']);
 select app.grant_columns_except('ticket_messages', 'update', array['id', 'ticket_id', 'channel', 'kind', 'created_by', 'created_at']);
+select app.grant_columns_except('ticket_invoices', 'update', array['id', 'ticket_id', 'stripe_customer_id', 'stripe_invoice_id', 'hosted_url', 'amount', 'created_at', 'due_at', 'created_by']);
 select app.grant_columns_except('profiles', 'update', array['id', 'email', 'is_active', 'created_at', 'updated_at']);
 select app.grant_columns_except('sheet_rows', 'update', array['id', 'workspace_id', 'fingerprint', 'raw', 'acted_by', 'created_at']);
 revoke insert on tickets from authenticated;  -- create_ticket() is the only door

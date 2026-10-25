@@ -18,6 +18,8 @@ export type BenchRow = {
   needs_payment: boolean;
   payment_amount: number | null;
   invoice_sent_at: string | null;
+  invoice_status: "open" | "paid" | "void" | "expired" | null;
+  invoice_due_at: string | null;
   payment_received: boolean;
   return_to_everett: boolean;
   coverage: "warranty" | "paid" | null;
@@ -120,9 +122,17 @@ export function progressLabel(t: BenchRow): string | null {
 export function rowTag(t: BenchRow, now: Date): BenchTicket["tag"] {
   if (t.waiting_for_parts) return { text: `Waiting on parts · asked ${formatDate(t.parts_requested_at, now)}`, tone: "amber" };
   if (t.parked) return { text: `Cannot replicate${t.slack_replies ? ` · Slack ${t.slack_replies} repl${t.slack_replies === 1 ? "y" : "ies"}` : ""}`, tone: "coral" };
-  if (t.awaiting_payment) return { text: [t.payment_amount != null ? `$${t.payment_amount.toFixed(0)}` : null, t.invoice_sent_at ? `invoice sent ${formatDate(t.invoice_sent_at, now)}` : "invoice not sent"].filter(Boolean).join(" · "), tone: "gold" };
+  if (t.awaiting_payment) return { text: [t.payment_amount != null ? `$${t.payment_amount.toFixed(0)}` : null, invoicePhrase(t, now)].filter(Boolean).join(" · "), tone: t.invoice_status === "expired" || t.invoice_status === "void" ? "coral" : "gold" };
   if (t.priority && t.stage !== "closed") return { text: "Priority", tone: "coral" };
   return null;
+}
+
+/** "invoice sent Oct 11" · "invoice expired Oct 18" · "invoice voided" · "invoice not sent". */
+export function invoicePhrase(t: Pick<BenchRow, "invoice_sent_at" | "invoice_status" | "invoice_due_at">, now: Date): string {
+  if (!t.invoice_sent_at || !t.invoice_status) return "invoice not sent";
+  if (t.invoice_status === "expired") return `invoice expired ${formatDate(t.invoice_due_at ?? t.invoice_sent_at, now)}`;
+  if (t.invoice_status === "void") return "invoice voided";
+  return `invoice sent ${formatDate(t.invoice_sent_at, now)}`;
 }
 
 export function decorate(rows: BenchRow[], grants: Grant[], now: Date): BenchTicket[] {
@@ -188,7 +198,7 @@ export function buildBench(
     over14: { count: over.length, note: over.length ? over.map((t) => firstName(t.customer_name)).join(" · ") : "everything is moving" },
     awaitingPayment: {
       count: payment.length,
-      note: payment[0] ? `${firstName(payment[0].customer_name)} · ${payment[0].invoice_sent_at ? `invoice sent ${formatDate(payment[0].invoice_sent_at, now)}` : "invoice not sent"}` : "nothing owed",
+      note: payment[0] ? `${firstName(payment[0].customer_name)} · ${invoicePhrase(payment[0], now)}` : "nothing owed",
     },
   };
 

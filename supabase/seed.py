@@ -211,7 +211,7 @@ TICKETS: list[dict] = [
 
     # ---------------------------------------------------------- Payment (1)
     dict(n=5, name="Sarah Chen", email="sarah@example.com", watch="Sector Deep", stage="payment", age=30, coverage="paid",
-         needs_payment=True, payment_amount=180, invoice_sent=12,
+         needs_payment=True, payment_amount=180, invoice_sent=3,
          serial="5090367", issue="Gritty crown and losing about two minutes a day. Out of warranty.",
          ship_to=addr("11 Tiburon Court", "Manhattan Beach", "CA", "90266"),
          steps={"check_in": step(True, done=30, by=REP),
@@ -330,7 +330,7 @@ TICKETS: list[dict] = [
          ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0012")),
 ]
 
-ticket_rows, step_rows, event_rows, message_rows, test_rows, photo_rows = [], [], [], [], [], []
+ticket_rows, step_rows, event_rows, message_rows, test_rows, photo_rows, invoice_rows = [], [], [], [], [], [], []
 eid = 4300
 mid = 4400
 xid = 4500
@@ -354,9 +354,17 @@ for t in TICKETS:
     ticket_rows.append(
         f"  ({q(tid)}, {q(t['number'])}, {q(WS)}, {q(NODUS)}, {q(t['watch'])}, {q(stage)}, {q(t.get('source', 'by_hand'))}, {q(t.get('claim'))}, {q(REP)}, "
         f"{q(t['name'])}, {q(t['email'])}, {q(t.get('phone'))}, {q(t['ship_to'])}, {q(t.get('serial'))}, {q(t['issue'])}, {q(t.get('bench_note'))}, "
-        f"{q(t.get('coverage'))}, {q(t.get('priority', False))}, {q(t.get('needs_payment', False))}, {q(t.get('payment_amount'))}, {days(t.get('invoice_sent'))}, {q(t.get('return_to_everett', False))}, "
+        f"{q(t.get('coverage'))}, {q(t.get('priority', False))}, {q(t.get('needs_payment', False))}, {q(t.get('payment_amount'))}, {q(t.get('return_to_everett', False))}, "
         f"{test_attempt}, {q(ship.get('carrier'))}, {q(ship.get('tracking'))}, {q(ship.get('label'))}, {days(closed_at)}, {days(age)}, {days(last_touch)})"
     )
+
+    if t.get("invoice_sent") is not None:
+        sent = t["invoice_sent"]
+        paid_on = steps["payment"]["done"] if steps["payment"]["answer"] else None
+        invoice_rows.append(
+            f"  ({q(uid(6000 + n))}, {q(tid)}, {q(f'cus_seed{n:04d}')}, {q(f'in_seed{n:04d}')}, {q('https://invoice.stripe.com/i/seed/' + t['number'])}, "
+            f"{t['payment_amount']}, {q('paid' if paid_on is not None else 'open')}, {days(sent)}, {days(sent - 7)}, {days(paid_on)}, {days(paid_on if paid_on is not None else sent)}, {q(REP)})"
+        )
 
     for s in STAGES:
         st = steps[s]
@@ -415,7 +423,7 @@ emit("-- The bench from the handoff: ten open tickets across the steps plus seve
 emit("-- every run; tickets created through the app keep their own ids and are never touched.")
 emit(f"delete from tickets where id in ({', '.join(q(t) for t in ticket_ids)});")
 emit("alter table tickets disable trigger tickets_updated_at;")
-emit("insert into tickets (id, number, workspace_id, brand_id, watch, stage, source, claim_ref, created_by, customer_name, customer_email, customer_phone, ship_to, serial, issue, bench_note, coverage, priority, needs_payment, payment_amount, invoice_sent_at, return_to_everett, test_attempt, ship_carrier, ship_tracking, label_url, closed_at, created_at, updated_at) values")
+emit("insert into tickets (id, number, workspace_id, brand_id, watch, stage, source, claim_ref, created_by, customer_name, customer_email, customer_phone, ship_to, serial, issue, bench_note, coverage, priority, needs_payment, payment_amount, return_to_everett, test_attempt, ship_carrier, ship_tracking, label_url, closed_at, created_at, updated_at) values")
 emit(",\n".join(ticket_rows) + ";")
 emit("alter table tickets enable trigger tickets_updated_at;")
 emit()
@@ -428,6 +436,10 @@ emit()
 emit("-- Emails are logged, not sent, until the sheet's addresses are scrubbed and a mailer is switched on.")
 emit("insert into ticket_messages (id, ticket_id, channel, kind, recipient, subject, body, status, external_id, reply_count, last_reply, replies_checked_at, created_by, created_at) values")
 emit(",\n".join(message_rows) + ";")
+emit()
+emit("-- Stripe invoices: seeded ids start with in_seed and are never looked up at Stripe.")
+emit("insert into ticket_invoices (id, ticket_id, stripe_customer_id, stripe_invoice_id, hosted_url, amount, status, created_at, due_at, paid_at, checked_at, created_by) values")
+emit(",\n".join(invoice_rows) + ";")
 emit()
 emit("insert into ticket_tests (id, ticket_id, attempt, kind, result, note, created_by, created_at) values")
 emit(",\n".join(test_rows) + ";")

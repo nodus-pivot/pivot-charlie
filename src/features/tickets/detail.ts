@@ -6,6 +6,7 @@ import type { Address } from "@/lib/address";
 import { STEPS, type Step } from "@/features/pipeline";
 import type { StepRecord } from "./summary";
 import { fetchSlackReplies } from "@/lib/slack";
+import { fetchInvoice, stripeConfigured, stripeError } from "@/lib/stripe";
 
 type Tables = Database["public"]["Tables"];
 export type TicketRow = Tables["tickets"]["Row"];
@@ -13,6 +14,7 @@ export type StepRow = Tables["ticket_steps"]["Row"];
 export type MessageRow = Tables["ticket_messages"]["Row"];
 export type TestRow = Tables["ticket_tests"]["Row"];
 export type PhotoRow = Tables["ticket_photos"]["Row"];
+export type InvoiceRow = Tables["ticket_invoices"]["Row"];
 export type EventRow = Tables["ticket_events"]["Row"] & { actor_name: string | null };
 
 export type TicketDetail = {
@@ -20,6 +22,8 @@ export type TicketDetail = {
   /** One record per step, in rail order, with the doer's name resolved. */
   steps: StepRecord[];
   messages: MessageRow[];
+  /** Newest first; the open one (if any) was checked against Stripe on this load. */
+  invoices: InvoiceRow[];
   tests: TestRow[];
   photos: PhotoRow[];
   events: EventRow[];
@@ -32,16 +36,20 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
   const { data: ticket } = await supabase.from("tickets").select("*").eq("number", number).maybeSingle();
   if (!ticket) return null;
 
-  const [steps, messages, tests, photos, events, sheetRow] = await Promise.all([
+  const [steps, messages, invoices, tests, photos, events, sheetRow] = await Promise.all([
     supabase.from("ticket_steps").select("*").eq("ticket_id", ticket.id),
     supabase.from("ticket_messages").select("*").eq("ticket_id", ticket.id).order("created_at"),
+    supabase.from("ticket_invoices").select("*").eq("ticket_id", ticket.id).order("created_at", { ascending: false }),
     supabase.from("ticket_tests").select("*").eq("ticket_id", ticket.id).order("created_at"),
     supabase.from("ticket_photos").select("*").eq("ticket_id", ticket.id).order("sort"),
     supabase.from("ticket_events").select("*").eq("ticket_id", ticket.id).order("created_at"),
     ticket.sheet_row_id ? supabase.from("sheet_rows").select("moved_to_tab, moved_at").eq("id", ticket.sheet_row_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
-  const messageRows = await refreshReplies(supabase, messages.data ?? []);
+  const [messageRows, invoiceRows] = await Promise.all([refreshReplies(supabase, messages.data ?? []), syncInvoices(supabase, invoices.data ?? [])]);
+  // A paid invoice ticks the payment step through a trigger: read the steps again so the page shows it.
+  const paidNow = invoiceRows.some((i, k) => i.status === "paid" && invoices.data?.[k]?.status !== "paid");
+  const stepRows = paidNow ? (await supabase.from("ticket_steps").select("*").eq("ticket_id", ticket.id)).data ?? steps.data : steps.data;
 
   const peopleIds = [
     ...(events.data ?? []).map((e) => e.actor_id),
@@ -55,7 +63,7 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
   return {
     ticket: { ...ticket, ship_to: (ticket.ship_to as Address | null) ?? null },
     // Rail order, whatever order Postgres returns the rows in (an update moves a row).
-    steps: (steps.data ?? [])
+    steps: (stepRows ?? [])
       .filter((s) => s.stage !== "closed")
       .sort((a, b) => STEPS.indexOf(a.stage as Step) - STEPS.indexOf(b.stage as Step))
       .map((s) => ({
@@ -68,6 +76,7 @@ export const getTicketDetail = cache(async (number: string): Promise<TicketDetai
         updated_at: s.updated_at,
       })),
     messages: messageRows,
+    invoices: invoiceRows,
     tests: tests.data ?? [],
     photos: photos.data ?? [],
     events: (events.data ?? []).map((e) => ({ ...e, actor_name: e.actor_id ? (nameOf.get(e.actor_id) ?? null) : null })),
@@ -99,6 +108,38 @@ async function refreshReplies(supabase: Awaited<ReturnType<typeof createClient>>
   );
   const byId = new Map(updates);
   return rows.map((m) => byId.get(m.id) ?? m);
+}
+
+const INVOICE_TTL_MS = 2 * 60_000;
+
+/**
+ * The open invoice is looked up at Stripe when its last check is older than
+ * two minutes: paid and void come from Stripe, expired is ours (past due_at
+ * and still unpaid). Seeded ids (in_seed…) and a missing key only stamp
+ * checked_at. Paid, void and expired are final.
+ */
+async function syncInvoices(supabase: Awaited<ReturnType<typeof createClient>>, rows: InvoiceRow[]): Promise<InvoiceRow[]> {
+  const open = rows.find((i) => i.status === "open");
+  if (!open) return rows;
+  const now = Date.now();
+  if (open.checked_at && now - new Date(open.checked_at).getTime() < INVOICE_TTL_MS) return rows;
+  const checked = new Date(now).toISOString();
+  let patch: Partial<InvoiceRow> = { checked_at: checked };
+  if (open.stripe_invoice_id.startsWith("in_seed") || !stripeConfigured()) {
+    patch = { checked_at: checked };
+  } else {
+    try {
+      const r = await fetchInvoice(open.stripe_invoice_id);
+      if (r.status === "paid") patch = { status: "paid", paid_at: r.paidAt, checked_at: checked, error: null };
+      else if (r.status === "void") patch = { status: "void", checked_at: checked, error: null };
+      else if (new Date(open.due_at).getTime() < now) patch = { status: "expired", checked_at: checked, error: null };
+      else patch = { checked_at: checked, error: null };
+    } catch (e) {
+      patch = { checked_at: checked, error: stripeError(e) };
+    }
+  }
+  await supabase.from("ticket_invoices").update(patch).eq("id", open.id);
+  return rows.map((i) => (i.id === open.id ? { ...i, ...patch } : i));
 }
 
 /** Who posted a message, for the Slack card's "Posted · Wes" line. */

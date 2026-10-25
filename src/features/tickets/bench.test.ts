@@ -20,6 +20,8 @@ function row(over: Partial<BenchRow> & { number: string; stage: BenchRow["stage"
     needs_payment: false,
     payment_amount: null,
     invoice_sent_at: null,
+    invoice_status: null,
+    invoice_due_at: null,
     payment_received: false,
     return_to_everett: false,
     coverage: "warranty",
@@ -49,7 +51,7 @@ const rows: BenchRow[] = [
   row({ number: "NW260016", stage: "repair", daysAgo: 8, customer_name: "Tyler McDonald" }),
   row({ number: "NW260002", stage: "test", daysAgo: 4, customer_name: "Maria Lopez", tests_passed: 3 }),
   row({ number: "NW260004", stage: "test", daysAgo: 3, customer_name: "Adam Ferguson", priority: true, tests_left: ["time", "water", "looks"] }),
-  row({ number: "NW260005", stage: "payment", daysAgo: 12, customer_name: "Sarah Chen", needs_payment: true, payment_amount: 180, invoice_sent_at: "2026-10-11T12:00:00Z", awaiting_payment: true }),
+  row({ number: "NW260005", stage: "payment", daysAgo: 12, customer_name: "Sarah Chen", needs_payment: true, payment_amount: 180, invoice_sent_at: "2026-10-11T12:00:00Z", invoice_status: "open", invoice_due_at: "2026-10-18T12:00:00Z", awaiting_payment: true }),
   row({ number: "NW260006", stage: "ship", daysAgo: 1, customer_name: "Leo Park", ship_ready: true }),
   row({ number: "NW260001", stage: "check_in", daysAgo: 20, customer_name: "Old Timer" }),
 ];
