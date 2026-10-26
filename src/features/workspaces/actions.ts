@@ -9,6 +9,7 @@ import { canAdministerWorkspace } from "@/features/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { countryField } from "@/features/intake/schema";
 import { postSlack } from "@/lib/slack";
+import { sendMail } from "@/lib/mail";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -131,5 +132,20 @@ export async function sendSlackTest(workspaceId: string): Promise<WsResult> {
   const ctx = await adminContext(workspaceId);
   if (!ctx.ok) return ctx;
   const r = await postSlack(`:wave: Pivot test from ${ctx.user.profile.display_name}. If you can read this, Pivot can post here.`);
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+/** Emails a hello to any address so an admin can confirm the mailbox works. */
+export async function sendMailTest(workspaceId: string, to: string): Promise<WsResult> {
+  if (!z.uuid().safeParse(workspaceId).success) return { ok: false, error: "Reload and try again." };
+  const addr = z.email().safeParse(to.trim().toLowerCase());
+  if (!addr.success) return { ok: false, error: "Enter a valid email address." };
+  const ctx = await adminContext(workspaceId);
+  if (!ctx.ok) return ctx;
+  const r = await sendMail({
+    to: addr.data,
+    subject: "Pivot test email",
+    text: `Hi, this is a test from Pivot sent by ${ctx.user.profile.display_name}. If you can read this, Pivot can email customers from this mailbox.`,
+  });
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

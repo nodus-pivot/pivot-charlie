@@ -9,7 +9,7 @@ import { CountrySelect } from "@/components/ui/country-select";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import type { Address } from "@/lib/address";
 import { cn } from "@/lib/utils";
-import { createBrand, renameBrand, sendSlackTest, setBrandActive, updateWorkspace, type AddressFields } from "../actions";
+import { createBrand, renameBrand, sendMailTest, sendSlackTest, setBrandActive, updateWorkspace, type AddressFields } from "../actions";
 import type { BrandSummary, Workspace } from "../queries";
 
 const field = "h-10 w-full border-b border-border-strong bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none";
@@ -20,7 +20,7 @@ function fields(a: Address | null | undefined): AddressFields {
 }
 
 /** Ops › Workspace: operating details, the two addresses that tickets use, and the brands. */
-export function WorkspaceSettings({ workspace, brands, isOwner, slack }: { workspace: Workspace; brands: BrandSummary[]; isOwner: boolean; slack: { configured: boolean; channel: string | null } }) {
+export function WorkspaceSettings({ workspace, brands, isOwner, slack, mail, myEmail }: { workspace: Workspace; brands: BrandSummary[]; isOwner: boolean; slack: { configured: boolean; channel: string | null }; mail: { configured: boolean; from: string | null }; myEmail: string }) {
   const router = useRouter();
   const [name, setName] = useState(workspace.name);
   const [prefix, setPrefix] = useState(workspace.ticket_prefix);
@@ -70,7 +70,7 @@ export function WorkspaceSettings({ workspace, brands, isOwner, slack }: { works
       </form>
 
       <Brands workspaceId={workspace.id} brands={brands} isOwner={isOwner} />
-      <Integrations workspaceId={workspace.id} slack={slack} />
+      <Integrations workspaceId={workspace.id} slack={slack} mail={mail} myEmail={myEmail} />
     </section>
   );
 }
@@ -165,9 +165,12 @@ function Brands({ workspaceId, brands, isOwner }: { workspaceId: string; brands:
   );
 }
 
-function Integrations({ workspaceId, slack }: { workspaceId: string; slack: { configured: boolean; channel: string | null } }) {
+function Integrations({ workspaceId, slack, mail, myEmail }: { workspaceId: string; slack: { configured: boolean; channel: string | null }; mail: { configured: boolean; from: string | null }; myEmail: string }) {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mailResult, setMailResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [to, setTo] = useState(myEmail);
   const [pending, start] = useTransition();
+  const [mailPending, startMail] = useTransition();
   function test() {
     setResult(null);
     start(async () => {
@@ -175,13 +178,20 @@ function Integrations({ workspaceId, slack }: { workspaceId: string; slack: { co
       setResult(r.ok ? { ok: true, text: "Posted. Check the channel." } : { ok: false, text: r.error });
     });
   }
+  function testMail() {
+    setMailResult(null);
+    startMail(async () => {
+      const r = await sendMailTest(workspaceId, to);
+      setMailResult(r.ok ? { ok: true, text: `Sent to ${to.trim()}. Check the inbox.` } : { ok: false, text: r.error });
+    });
+  }
   return (
     <div className="flex max-w-[980px] flex-col gap-4">
       <div className="flex flex-col gap-1">
         <Eyebrow>Integrations</Eyebrow>
-        <p className="text-[13px] text-ink-3">Parts requests and customer address changes post to one Slack channel. The token and channel live in the hosting settings, not here.</p>
+        <p className="text-[13px] text-ink-3">Parts requests and customer address changes post to one Slack channel; customer emails go out from one mailbox. Tokens and passwords live in the hosting settings, not here.</p>
       </div>
-      <div className="flex flex-wrap items-center gap-4 border-t border-b border-rule py-3.5">
+      <div className="flex flex-wrap items-center gap-4 border-t border-rule py-3.5">
         <span className="flex flex-1 items-baseline gap-3">
           <span className="font-display text-[22px] font-semibold text-ink">Slack</span>
           {slack.configured ? <Chip tone="green">configured</Chip> : <Chip tone="amber">not configured</Chip>}
@@ -190,6 +200,23 @@ function Integrations({ workspaceId, slack }: { workspaceId: string; slack: { co
         <Button size="sm" disabled={!slack.configured || pending} onClick={test}>{pending ? "Sending…" : "Send a test message"}</Button>
       </div>
       {result ? <p role={result.ok ? "status" : "alert"} className={cn("text-[13px]", result.ok ? "text-green" : "text-coral")}>{result.text}</p> : null}
+      <div className="flex flex-wrap items-center gap-4 border-t border-b border-rule py-3.5">
+        <span className="flex flex-1 items-baseline gap-3">
+          <span className="font-display text-[22px] font-semibold text-ink">Email</span>
+          {mail.configured ? <Chip tone="green">configured</Chip> : <Chip tone="amber">not configured</Chip>}
+          {mail.from ? <span className="font-mono text-xs text-ink-3">{mail.from}</span> : null}
+        </span>
+        <input
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          type="email"
+          placeholder="Send a test to…"
+          aria-label="Test email address"
+          className="h-9 w-64 border-b border-border-strong bg-transparent text-[14px] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none"
+        />
+        <Button size="sm" disabled={!mail.configured || mailPending || !to.trim()} onClick={testMail}>{mailPending ? "Sending…" : "Send a test email"}</Button>
+      </div>
+      {mailResult ? <p role={mailResult.ok ? "status" : "alert"} className={cn("text-[13px]", mailResult.ok ? "text-green" : "text-coral")}>{mailResult.text}</p> : null}
     </div>
   );
 }
