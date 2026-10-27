@@ -140,21 +140,21 @@ PASS3 = lambda ago, attempt=1: [(attempt, k, "pass", ago, None) for k in ("time"
 
 TICKETS: list[dict] = [
     # ---------------------------------------------------------- Check in (3)
-    dict(n=11, name="Michael Becker", email="michael.b@example.com", watch="Canyon", stage="check_in", age=9, source="sheet",
+    dict(n=11, name="Michael Becker", email="pengcheng95+demo11@gmail.com", watch="Canyon", stage="check_in", age=9, source="sheet",
          claim="7c1d2be2d8891a4f", serial="612044", issue="Second hand stopped. Watch was fully wound and worn daily.",
          ship_to=addr("18 Linden Way", "Portland", "OR", "97214"),
          steps={}),
-    dict(n=13, name="Bobby Fisher", email="bobby.f@example.com", watch="Avalon II", stage="check_in", age=9, source="sheet",
+    dict(n=13, name="Bobby Fisher", email="pengcheng95+demo13@gmail.com", watch="Avalon II", stage="check_in", age=9, source="sheet",
          claim="91ab2be2d8891c22", serial="402511", issue="Bracelet pin fell out and the clasp no longer closes.",
          ship_to=addr("2200 Pine St", "Boulder", "CO", "80302"),
          steps={}),
-    dict(n=17, name="Matthew Stanley", email="matt.stanley@example.com", watch="Sector Pilot", stage="check_in", age=3,
+    dict(n=17, name="Matthew Stanley", email="pengcheng95+demo17@gmail.com", watch="Sector Pilot", stage="check_in", age=3,
          serial="5090821", issue="Crown won't screw down. Possibly cross-threaded.", bench_note="Dropped off in person, box and papers included.",
          ship_to=addr("411 Cedar Ave", "Spokane", "WA", "99201"),
          steps={}),
 
     # ---------------------------------------------------------- Inspect · parked (1)
-    dict(n=9, name="Owen Brooks", email="owen@example.com", watch="TrailTrekker", stage="inspect", age=3, return_to_everett=True,
+    dict(n=9, name="Owen Brooks", email="pengcheng95+demo09@gmail.com", watch="TrailTrekker", stage="inspect", age=3, return_to_everett=True,
          serial="1292", issue="New watch arrived with a divot in the bezel near 10. Customer is returning it.",
          ship_to=addr("35475 Marabella Ct", "Winchester", "CA", "92596"),
          steps={"check_in": step(True, done=2, by=WES),
@@ -164,7 +164,7 @@ TICKETS: list[dict] = [
                          replies=1, last_reply="Asking the customer for a photo of the divot.", by=WES)]),
 
     # ---------------------------------------------------------- Supply · waiting (1)
-    dict(n=3, name="James Whitfield", email="james@example.com", watch="Sector GMT", stage="supply", age=29, source="sheet",
+    dict(n=3, name="James Whitfield", email="pengcheng95+demo03@gmail.com", watch="Sector GMT", stage="supply", age=29, source="sheet",
          claim="1a0d1be2d8891a0a", serial="5080093", issue="Crown fell off while setting the time. Dial has a scratch at 10.",
          ship_to=addr("21 Hampshire Rd", "Midland Park", "NJ", "07432"),
          steps={"check_in": step(True, done=28, by=REP),
@@ -176,7 +176,7 @@ TICKETS: list[dict] = [
          photos=[("customer", "seed.jpg")]),
 
     # ---------------------------------------------------------- Repair (1)
-    dict(n=16, name="Tyler McDonald", email="tyler.m@example.com", watch="Avalon II", stage="repair", age=12, coverage="warranty",
+    dict(n=16, name="Tyler McDonald", email="pengcheng95+demo16@gmail.com", watch="Avalon II", stage="repair", age=12, coverage="warranty",
          serial="402390", issue="Winding feels gritty and the date doesn't change at midnight.",
          ship_to=addr("77 Grand Ave", "Los Angeles", "CA", "90013"),
          steps={"check_in": step(True, done=12, by=REP),
@@ -185,7 +185,7 @@ TICKETS: list[dict] = [
                 "repair": step(None, "Movement out, keyless works cleaned and oiled.")}),
 
     # ---------------------------------------------------------- Test (2)
-    dict(n=2, name="Maria Lopez", email="maria@example.com", watch="Avalon II", stage="test", age=20, source="sheet",
+    dict(n=2, name="Maria Lopez", email="pengcheng95+demo02@gmail.com", watch="Avalon II", stage="test", age=20, source="sheet",
          claim="4f2d1be2d8891b77", serial="402376", issue="Second hand stutters and the watch loses about two minutes a day.",
          ship_to=addr("504 2nd St", "Liverpool", "NY", "13088"),
          steps={"check_in": step(True, done=19, by=REP),
@@ -194,7 +194,7 @@ TICKETS: list[dict] = [
                 "repair": step(True, "Movement regulated, mainspring and gaskets replaced.", done=4, by=RANE),
                 "test": step(None, "+3 s/d dial up, amplitude 275°. 100 m pass.")},
          tests=PASS3(1)),
-    dict(n=4, name="Adam Ferguson", email="adam@example.com", phone="(213) 555-0144", watch="Contrail GMT", stage="test", age=12,
+    dict(n=4, name="Adam Ferguson", email="pengcheng95+demo04@gmail.com", phone="(213) 555-0144", watch="Contrail GMT", stage="test", age=12,
          priority=True, coverage="warranty", serial="504004",
          issue="Bezel doesn't click and rotates freely. Deep scratch on the case at 4 o'clock.",
          ship_to=addr("77 Grand Ave", "Los Angeles", "CA", "90013"),
@@ -210,7 +210,7 @@ TICKETS: list[dict] = [
                    (REP, 7, "Customer asked for an update. Told him early next week.")]),
 
     # ---------------------------------------------------------- Payment (1)
-    dict(n=5, name="Sarah Chen", email="sarah@example.com", watch="Sector Deep", stage="payment", age=30, coverage="paid",
+    dict(n=5, name="Sarah Chen", email="pengcheng95+demo05@gmail.com", watch="Sector Deep", stage="payment", age=30, coverage="paid",
          needs_payment=True, payment_amount=180, invoice_sent=3,
          serial="5090367", issue="Gritty crown and losing about two minutes a day. Out of warranty.",
          ship_to=addr("11 Tiburon Court", "Manhattan Beach", "CA", "90266"),
@@ -223,7 +223,7 @@ TICKETS: list[dict] = [
          tests=PASS3(12)),
 
     # ---------------------------------------------------------- Ship (1)
-    dict(n=6, name="Leo Park", email="leo@example.com", watch="Avalon II", stage="ship", age=20, coverage="warranty",
+    dict(n=6, name="Leo Park", email="pengcheng95+demo06@gmail.com", watch="Avalon II", stage="ship", age=20, coverage="warranty",
          serial="402385", issue="Bezel insert cracked after a knock against a door frame.",
          ship_to=addr("506 Market St", "Los Angeles", "CA", "90013"),
          steps={"check_in": step(True, done=20, by=REP),
@@ -236,7 +236,7 @@ TICKETS: list[dict] = [
          ship=dict(carrier="USPS Priority", tracking="9405 5118 9922 0310 4471 02", label="https://example.com/labels/NW260006.pdf")),
 
     # ---------------------------------------------------------- Closed (7)
-    dict(n=7, name="Tom Reyes", email="tom@example.com", watch="Sector GMT", stage="closed", age=59, coverage="warranty",
+    dict(n=7, name="Tom Reyes", email="pengcheng95+demo07@gmail.com", watch="Sector GMT", stage="closed", age=59, coverage="warranty",
          serial="5030761", issue="Clasp would not stay closed.",
          ship_to=addr("7218 Murray Lane", "Annandale", "VA", "22003"),
          steps={"check_in": step(True, done=59, by=REP),
@@ -250,7 +250,7 @@ TICKETS: list[dict] = [
          sent_back=50,
          ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0001"),
          photos=[("bench", "seed.jpg")]),
-    dict(n=8, name="Priya Nair", email="priya@example.com", watch="Contrail GMT", stage="closed", age=55, coverage="paid",
+    dict(n=8, name="Priya Nair", email="pengcheng95+demo08@gmail.com", watch="Contrail GMT", stage="closed", age=55, coverage="paid",
          needs_payment=True, payment_amount=95, invoice_sent=47,
          serial="504018", issue="Crystal chipped at the edge. Out of warranty.",
          ship_to=addr("9337 Hillside Dr", "Champlin", "MN", "55316"),
@@ -263,7 +263,7 @@ TICKETS: list[dict] = [
                 "ship": step(done=44, by=RANE)},
          tests=PASS3(47),
          ship=dict(carrier="UPS", tracking="1Z 999 AA1 01 2345 6784")),
-    dict(n=19, name="Lena Park", email="lena.park@example.com", watch="Sector Deep", stage="closed", age=46, coverage="warranty",
+    dict(n=19, name="Lena Park", email="pengcheng95+demo19@gmail.com", watch="Sector Deep", stage="closed", age=46, coverage="warranty",
          serial="5090412", issue="Watch stops overnight.",
          ship_to=addr("88 Ocean Blvd", "Santa Cruz", "CA", "95060"),
          steps={"check_in": step(True, done=46, by=REP),
@@ -278,7 +278,7 @@ TICKETS: list[dict] = [
                          "Cannot replicate reported issue · NW260019 · Sector Deep · Lena Park\nReported: Watch stops overnight.\nRane: Ran 72 h on the winder and on the wrist, no stop. Power reserve 41 h.",
                          replies=1, last_reply="Customer agrees, send it back with winding instructions.")],
          ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0042")),
-    dict(n=14, name="Marcus Hill", email="marcus.h@example.com", watch="Canyon", stage="closed", age=66, coverage="warranty",
+    dict(n=14, name="Marcus Hill", email="pengcheng95+demo14@gmail.com", watch="Canyon", stage="closed", age=66, coverage="warranty",
          serial="612008", issue="Running fast, about a minute a day.",
          ship_to=addr("300 W 5th St", "Austin", "TX", "78701"),
          steps={"check_in": step(True, done=66, by=REP),
@@ -290,7 +290,7 @@ TICKETS: list[dict] = [
                 "ship": step(done=54, by=RANE)},
          tests=PASS3(55),
          ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0014")),
-    dict(n=10, name="Jenna Ortiz", email="jenna.o@example.com", watch="Avalon II", stage="closed", age=74, coverage="warranty",
+    dict(n=10, name="Jenna Ortiz", email="pengcheng95+demo10@gmail.com", watch="Avalon II", stage="closed", age=74, coverage="warranty",
          serial="402299", issue="Fogging under the crystal after swimming.",
          ship_to=addr("1420 Elm St", "Dallas", "TX", "75201"),
          steps={"check_in": step(True, done=74, by=REP),
@@ -303,7 +303,7 @@ TICKETS: list[dict] = [
          tests=[(1, "time", "pass", 66, None), (1, "water", "fail", 66, "Leak at the caseback on the first test")] + PASS3(63, 2),
          sent_back=66,
          ship=dict(carrier="USPS", tracking="9400 1108 4007 2231 0010")),
-    dict(n=1, name="Sam Whitaker", email="sam.w@example.com", watch="Sector Pilot", stage="closed", age=80, coverage="paid",
+    dict(n=1, name="Sam Whitaker", email="pengcheng95+demo01@gmail.com", watch="Sector Pilot", stage="closed", age=80, coverage="paid",
          needs_payment=True, payment_amount=120, invoice_sent=68,
          serial="5090102", issue="Bezel insert faded and chipped. Out of warranty.",
          ship_to=addr("9 Harbor View", "Newport", "RI", "02840"),
@@ -316,7 +316,7 @@ TICKETS: list[dict] = [
                 "ship": step(done=66, by=RANE)},
          tests=PASS3(68),
          ship=dict(carrier="FedEx", tracking="7489 2231 0001")),
-    dict(n=12, name="Dana Whitmore", email="dana.w@example.com", watch="Sector Deep", stage="closed", age=90, source="sheet", coverage="warranty",
+    dict(n=12, name="Dana Whitmore", email="pengcheng95+demo12@gmail.com", watch="Sector Deep", stage="closed", age=90, source="sheet", coverage="warranty",
          claim="1a0d1be2d8891a0b", serial="5080131", issue="Crown tube loose, crown wobbles.",
          ship_to=addr("2234 E Wilson Ave", "Salt Lake City", "UT", "84108"),
          steps={"check_in": step(True, done=89, by=REP),
