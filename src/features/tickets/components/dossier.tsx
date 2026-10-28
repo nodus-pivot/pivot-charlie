@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { Microphone } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Microphone } from "@phosphor-icons/react";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { SoonIcon } from "@/components/ui/soon";
 import { Segmented } from "@/components/ui/segmented";
@@ -10,7 +10,7 @@ import { CountrySelect } from "@/components/ui/country-select";
 import { addressInline, type Address } from "@/lib/address";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { addComment, updateTicketDetails, type DetailsInput } from "../actions";
+import { addComment, resendEmail, updateTicketDetails, type DetailsInput } from "../actions";
 import { PhotoStrip } from "./photo-strip";
 
 export type DossierData = {
@@ -27,6 +27,9 @@ export type DossierData = {
   bench_note: string | null;
   photos: { id: string; path: string; kind: "customer" | "bench" }[];
   comments: { id: string; actor: string; date: string; body: string }[];
+  /** Customer emails on this ticket, oldest first. */
+  emails: { id: string; label: string; date: string; status: "logged" | "sent" | "failed"; error: string | null }[];
+  canResend: boolean;
 };
 
 type Fields = DetailsInput;
@@ -153,6 +156,16 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
           </Row>
         ) : null}
 
+        {data.emails.length ? (
+          <Row label="Emails to the customer">
+            <ul className="flex flex-col gap-1.5">
+              {data.emails.map((e) => (
+                <EmailLine key={e.id} number={data.number} email={e} canResend={data.canResend} />
+              ))}
+            </ul>
+          </Row>
+        ) : null}
+
         <div className="flex flex-1 flex-col gap-3 border-t border-rule pt-3.5">
           <span className="text-[11px] uppercase tracking-label text-ink-3">Comments · <span className="normal-case tracking-normal">internal</span></span>
           {data.comments.length === 0 ? <p className="text-xs text-ink-3">No comments yet.</p> : null}
@@ -166,6 +179,35 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
         </div>
       </div>
     </aside>
+  );
+}
+
+function EmailLine({ number, email, canResend }: { number: string; email: DossierData["emails"][number]; canResend: boolean }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const tone = email.status === "sent" ? "text-green" : email.status === "failed" ? "text-coral" : "text-ink-3";
+  const word = email.status === "sent" ? "sent" : email.status === "failed" ? "failed" : "logged";
+  return (
+    <li className="flex flex-col gap-0.5 text-sm">
+      <span className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-ink-2">{email.label}</span>
+        <span className="text-xs text-ink-3">{email.date}</span>
+        <span className={cn("text-xs", tone)}>{word}</span>
+        {canResend && email.status !== "sent" ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => { setError(null); start(async () => { const r = await resendEmail(number, email.id); if (!r.ok) setError(r.error); else router.refresh(); }); }}
+            className="inline-flex items-center gap-1 text-xs text-ink-2 transition-colors hover:text-ink disabled:opacity-60"
+          >
+            <ArrowCounterClockwise size={12} aria-hidden /> {pending ? "Sending…" : "Send again"}
+          </button>
+        ) : null}
+      </span>
+      {email.status === "failed" && email.error ? <span className="truncate text-xs text-ink-3" title={email.error}>{email.error}</span> : null}
+      {error ? <span role="alert" className="text-xs text-coral">{error}</span> : null}
+    </li>
   );
 }
 

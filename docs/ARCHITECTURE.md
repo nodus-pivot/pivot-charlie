@@ -45,7 +45,8 @@ src/
 - **One row per step.** What a step records (its Yes / No, its text, when it was done) lives in
   `ticket_steps`, never in columns on `tickets`. Parked, waiting for parts and awaiting payment
   are computed in the `ticket_board` view. Every Slack post and customer email is a
-  `ticket_messages` row; emails stay `logged` until a mailer is switched on.
+  `ticket_messages` row; customer emails render from `features/mail/templates.ts` and go out through
+  `features/mail/send.ts` only when `MAIL_ENABLED` is on (otherwise they stay `logged`).
 - **Stripe invoices** are `ticket_invoices` rows written by `sendInvoice` through `lib/stripe.ts`; the
   ticket page's loader (`detail.ts`) asks Stripe about the open one at most every two minutes. No webhook.
 - **The sheet is written in exactly three places**: move a row to the month tab (create), move a

@@ -119,11 +119,11 @@ def slack(kind, ago, body, replies=0, last_reply=None, by=None):
 
 
 def email(kind, ago, to, subject, body):
-    return dict(channel="email", kind=kind, ago=ago, body=body, recipient=to, subject=subject, by=RANE, status="logged", replies=0)
+    return dict(channel="email", kind=kind, ago=ago, body=body, recipient=to, subject=subject, by=RANE, status="sent", replies=0)
 
 
-RECEIVED_SUBJECT = "We received your watch"
-SHIPPED_SUBJECT = "Your watch is on its way"
+RECEIVED_SUBJECT = "Your watch has arrived and is in diagnostics"
+SHIPPED_SUBJECT = "Your watch has shipped"
 
 
 def received_email(t, ago):
@@ -433,7 +433,7 @@ emit()
 emit("insert into ticket_events (id, ticket_id, type, actor_id, from_stage, to_stage, body, created_at, payload) values")
 emit(",\n".join(event_rows) + ";")
 emit()
-emit("-- Emails are logged, not sent, until the sheet's addresses are scrubbed and a mailer is switched on.")
+emit("-- Customer emails: sent rows for the demo (every address is a plus-address of the test inbox).")
 emit("insert into ticket_messages (id, ticket_id, channel, kind, recipient, subject, body, status, external_id, reply_count, last_reply, replies_checked_at, created_by, created_at) values")
 emit(",\n".join(message_rows) + ";")
 emit()

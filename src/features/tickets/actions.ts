@@ -10,6 +10,8 @@ import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
 import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
 import { createInvoice, fetchInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
+import { resendTicketEmail, sendTicketEmail, statusUrl } from "@/features/mail/send";
+import type { EmailKind, TicketEmailData } from "@/features/mail/templates";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -188,8 +190,9 @@ export async function advanceTicket(ticketNumber: string, opts: { override?: boo
   const from = t.stage;
   const { error } = await t.supabase.rpc("advance", { p_ticket: t.id, p_override: !!opts.override });
   if (error) return { ok: false, error: message(error) };
-  if (from === "check_in") await logEmail(t, "received");
-  if (from === "ship") await logEmail(t, "shipped");
+  if (from === "check_in") await emailTicket(t, "received");
+  if (from === "test") await emailTicket(t, "tested");
+  if (from === "ship") await emailTicket(t, "shipped");
   await drainQuietly(t.id);
   refresh(ticketNumber);
   return { ok: true };
@@ -238,23 +241,61 @@ export async function reopenTicket(ticketNumber: string): Promise<ActionResult> 
  * Customer emails are logged, never sent, until the sheet's addresses are
  * scrubbed and a mailer exists. One row per kind per ticket.
  */
-async function logEmail(t: Loaded, kind: "received" | "shipped" | "invoice", extra?: { url: string; amount: number }) {
-  const { data: ticket } = await t.supabase.from("tickets").select("customer_name, customer_email, watch, ship_tracking, ship_carrier").eq("id", t.id).single();
-  if (!ticket?.customer_email) return;
-  // One received and one shipped email per ticket; every invoice gets its own.
-  if (kind !== "invoice") {
-    const { data: already } = await t.supabase.from("ticket_messages").select("id").eq("ticket_id", t.id).eq("channel", "email").eq("kind", kind).limit(1);
-    if (already?.length) return;
+/** Everything the four customer emails can mention, read fresh from the ticket. */
+async function emailData(t: Loaded, extra?: { url: string; amount: number; dueAt: string }): Promise<{ to: string; data: TicketEmailData } | null> {
+  const [{ data: ticket }, { data: repair }] = await Promise.all([
+    t.supabase.from("tickets").select("customer_name, customer_email, watch, issue, ship_tracking, ship_carrier, needs_payment, payment_amount").eq("id", t.id).single(),
+    t.supabase.from("ticket_steps").select("notes").eq("ticket_id", t.id).eq("stage", "repair").maybeSingle(),
+  ]);
+  if (!ticket?.customer_email) return null;
+  return {
+    to: ticket.customer_email,
+    data: {
+      number: t.number,
+      watch: ticket.watch,
+      customerName: ticket.customer_name,
+      issue: ticket.issue,
+      repairNotes: repair?.notes ?? null,
+      amount: extra?.amount ?? ticket.payment_amount,
+      payUrl: extra?.url ?? null,
+      dueAt: extra?.dueAt ?? null,
+      carrier: ticket.ship_carrier,
+      tracking: ticket.ship_tracking,
+      needsPayment: ticket.needs_payment,
+      statusUrl: statusUrl(),
+    },
+  };
+}
+
+/** Received, tested and shipped go once per ticket; every invoice gets its own email. */
+async function emailTicket(t: Loaded, kind: EmailKind, extra?: { url: string; amount: number; dueAt: string }) {
+  const e = await emailData(t, extra);
+  if (!e) return;
+  await sendTicketEmail(t.supabase, t.id, kind, e.to, e.data, t.userId, { oncePerTicket: kind !== "invoice" });
+}
+
+/** "Send again" on a failed (or logged) email row. Re-reads the ticket so the words are current; invoices keep their pay link. */
+export async function resendEmail(ticketNumber: string, messageId: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(messageId).success) return { ok: false, error: "Reload and try again." };
+  const t = await load(ticketNumber);
+  if (!t.ok) return t;
+  if (!mayEdit(t)) return { ok: false, error: "Your role can't send emails." };
+  const { data: m } = await t.supabase.from("ticket_messages").select("id, kind, body, created_at").eq("id", messageId).eq("ticket_id", t.id).eq("channel", "email").maybeSingle();
+  if (!m) return { ok: false, error: "That email is gone." };
+  const kind = m.kind as EmailKind;
+  let extra: { url: string; amount: number; dueAt: string } | undefined;
+  if (kind === "invoice") {
+    const { data: inv } = await t.supabase.from("ticket_invoices").select("hosted_url, amount, due_at").eq("ticket_id", t.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!inv) return { ok: false, error: "No invoice to send." };
+    extra = { url: inv.hosted_url, amount: inv.amount, dueAt: inv.due_at };
   }
-  const first = ticket.customer_name.split(/\s+/)[0];
-  const subject = kind === "received" ? "We received your watch" : kind === "shipped" ? "Your watch is on its way" : `Invoice for your ${ticket.watch} repair`;
-  const body =
-    kind === "received"
-      ? `Hi ${first}, your ${ticket.watch} is on the bench. Ticket ${t.number}. We'll write again when it ships.`
-      : kind === "shipped"
-        ? `Hi ${first}, your ${ticket.watch} shipped today${ticket.ship_tracking ? ` · ${[ticket.ship_carrier, ticket.ship_tracking].filter(Boolean).join(" ")}` : ""}. Ticket ${t.number}.`
-        : `Hi ${first}, the repair on your ${ticket.watch} comes to $${extra!.amount.toFixed(2)}. Pay here: ${extra!.url}. Ticket ${t.number}.`;
-  await t.supabase.from("ticket_messages").insert({ ticket_id: t.id, channel: "email", kind, recipient: ticket.customer_email, subject, body, status: "logged", created_by: t.userId });
+  const e = await emailData(t, extra);
+  if (!e) return { ok: false, error: "The customer needs an email address first." };
+  const r = await resendTicketEmail(t.supabase, m.id, kind, e.to, e.data);
+  refresh(ticketNumber);
+  if (r.status === "failed") return { ok: false, error: r.error ?? "Sending failed." };
+  if (r.status === "logged") return { ok: false, error: "Sending is switched off (MAIL_ENABLED); the email was logged only." };
+  return { ok: true };
 }
 
 export type SlackPostResult = ActionResult & { slack?: { ok: boolean; error?: string } };
@@ -419,7 +460,7 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
     created_by: t.userId,
   });
   if (error) return { ok: false, error: message(error) };
-  await logEmail(t, "invoice", { url: created.url, amount: ticket.payment_amount });
+  await emailTicket(t, "invoice", { url: created.url, amount: ticket.payment_amount, dueAt: created.dueAt });
   refresh(ticketNumber);
   return { ok: true };
 }

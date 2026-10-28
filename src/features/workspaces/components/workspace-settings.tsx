@@ -20,7 +20,7 @@ function fields(a: Address | null | undefined): AddressFields {
 }
 
 /** Ops › Workspace: operating details, the two addresses that tickets use, and the brands. */
-export function WorkspaceSettings({ workspace, brands, isOwner, slack, mail, myEmail }: { workspace: Workspace; brands: BrandSummary[]; isOwner: boolean; slack: { configured: boolean; channel: string | null }; mail: { configured: boolean; from: string | null }; myEmail: string }) {
+export function WorkspaceSettings({ workspace, brands, isOwner, slack, mail, myEmail }: { workspace: Workspace; brands: BrandSummary[]; isOwner: boolean; slack: { configured: boolean; channel: string | null }; mail: { configured: boolean; enabled: boolean; from: string | null }; myEmail: string }) {
   const router = useRouter();
   const [name, setName] = useState(workspace.name);
   const [prefix, setPrefix] = useState(workspace.ticket_prefix);
@@ -165,7 +165,7 @@ function Brands({ workspaceId, brands, isOwner }: { workspaceId: string; brands:
   );
 }
 
-function Integrations({ workspaceId, slack, mail, myEmail }: { workspaceId: string; slack: { configured: boolean; channel: string | null }; mail: { configured: boolean; from: string | null }; myEmail: string }) {
+function Integrations({ workspaceId, slack, mail, myEmail }: { workspaceId: string; slack: { configured: boolean; channel: string | null }; mail: { configured: boolean; enabled: boolean; from: string | null }; myEmail: string }) {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [mailResult, setMailResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [to, setTo] = useState(myEmail);
@@ -204,6 +204,7 @@ function Integrations({ workspaceId, slack, mail, myEmail }: { workspaceId: stri
         <span className="flex flex-1 items-baseline gap-3">
           <span className="font-display text-[22px] font-semibold text-ink">Email</span>
           {mail.configured ? <Chip tone="green">configured</Chip> : <Chip tone="amber">not configured</Chip>}
+          {mail.configured ? (mail.enabled ? <Chip tone="green">sending</Chip> : <Chip tone="amber">logging only</Chip>) : null}
           {mail.from ? <span className="font-mono text-xs text-ink-3">{mail.from}</span> : null}
         </span>
         <input

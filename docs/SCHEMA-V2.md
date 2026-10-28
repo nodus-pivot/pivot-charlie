@@ -32,7 +32,7 @@ had or received · repair `answer` = complete, `notes` = what you did · test `a
 ## Enums
 
 Dropped `component`, `finding_condition`, `finding_action`. Added `message_channel` (slack, email),
-`message_kind` (parts_needed, cannot_replicate, received, shipped, invoice), `message_status` (logged, sent, failed),
+`message_kind` (parts_needed, cannot_replicate, received, shipped, invoice, tested), `message_status` (logged, sent, failed),
 `invoice_status` (open, paid, void, expired).
 
 ## Functions and view
@@ -50,11 +50,15 @@ Dropped `component`, `finding_condition`, `finding_action`. Added `message_chann
 - `customer_ticket_status` reads `ticket_steps`; Payment shows as "Awaiting payment" on paid repairs.
 - The `Payment Received?` sheet cell follows the payment step's `answer` through a trigger.
 
-## Still logged, not sent
+## Customer emails
 
-Customer emails (`received`, `shipped`, `invoice` with the Stripe pay link) are written to `ticket_messages` with status `logged`. Nothing
-emails anyone until the sheet's test rows carry safe addresses. Slack posts go to the one channel in
-`SLACK_CHANNEL_ID`; reply counts need the `channels:history` scope and a reinstall.
+Four emails, one `ticket_messages` row each: `received` (Check in → Received), `tested` (Test → Tests passed),
+`invoice` (Payment → Send invoice, with the Stripe pay link) and `shipped` (Ship → Shipped). Templates in
+`features/mail/templates.ts` (pure, tested); `features/mail/send.ts` writes the row as `logged`, then sends through
+`lib/mail.ts` (Gmail SMTP: `MAIL_FROM` + `MAIL_APP_PASSWORD`) and marks it `sent` or `failed`. `MAIL_ENABLED`
+must be true for anything to leave; a failed send never blocks a step, and the ticket's dossier offers Send again.
+While testing, every customer address is a plus-address of one inbox (`scripts/plus-address-emails.mjs`).
+Slack posts go to the one channel in `SLACK_CHANNEL_ID`; reply counts need the `channels:history` scope and a reinstall.
 
 ## Stripe
 

@@ -31,7 +31,7 @@ export type SummaryInput = {
   steps: StepRecord[];
   tests: { attempt: number; kind: string; result: string }[];
   test_attempt: number;
-  messages: { channel: "slack" | "email"; kind: string; created_at: string; reply_count: number }[];
+  messages: { channel: "slack" | "email"; kind: string; created_at: string; reply_count: number; status?: "logged" | "sent" | "failed" }[];
 };
 
 export function stepOf(t: { steps: StepRecord[] }, stage: Step): StepRecord | undefined {
@@ -59,7 +59,7 @@ export function stepSummary(t: SummaryInput, stage: Step): string | null {
   if (s.skipped) return stage === "payment" ? "Not required · warranty" : "skipped · nothing wrong";
   switch (stage) {
     case "check_in":
-      return s.done_by_name;
+      return [s.done_by_name, emailWord(t, "received")].filter(Boolean).join(" · ") || null;
     case "inspect":
       return [s.answer === false ? "Nothing wrong" : s.answer ? "Issue present" : null, firstLine(s.notes)].filter(Boolean).join(" · ") || null;
     case "supply":
@@ -68,15 +68,20 @@ export function stepSummary(t: SummaryInput, stage: Step): string | null {
       return firstLine(s.notes) ?? "Repaired";
     case "test": {
       const attempts = Math.max(1, ...t.tests.map((x) => x.attempt));
-      return attempts > 1 ? `all pass · attempt ${attempts}` : "all pass";
+      return [attempts > 1 ? `all pass · attempt ${attempts}` : "all pass", emailWord(t, "tested")].filter(Boolean).join(" · ");
     }
     case "payment":
-      return t.payment_amount != null ? `$${t.payment_amount.toFixed(0)} · paid` : "paid";
-    case "ship": {
-      const emailed = t.messages.some((m) => m.channel === "email" && m.kind === "shipped");
-      return [[t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || "shipped", emailed ? "email sent" : null].filter(Boolean).join(" · ");
-    }
+      return [t.payment_amount != null ? `$${t.payment_amount.toFixed(0)} · paid` : "paid", emailWord(t, "invoice")].filter(Boolean).join(" · ");
+    case "ship":
+      return [[t.ship_carrier, t.ship_tracking].filter(Boolean).join(" ") || "shipped", emailWord(t, "shipped")].filter(Boolean).join(" · ");
   }
+}
+
+/** "email sent" · "email failed" · "email logged" (sending off) · null when none was recorded. Newest row of the kind wins. */
+export function emailWord(t: Pick<SummaryInput, "messages">, kind: string): string | null {
+  const m = [...t.messages].reverse().find((x) => x.channel === "email" && x.kind === kind);
+  if (!m) return null;
+  return m.status === "failed" ? "email failed" : m.status === "logged" ? "email logged" : "email sent";
 }
 
 export function stepRows(t: SummaryInput, now: Date = new Date()): StepRow[] {

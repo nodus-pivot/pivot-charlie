@@ -896,6 +896,7 @@ export type Database = {
         | "received"
         | "shipped"
         | "invoice"
+        | "tested"
       message_status: "logged" | "sent" | "failed"
       photo_kind: "customer" | "bench"
       sheet_row_status: "imported" | "dismissed"
@@ -1049,6 +1050,7 @@ export const Constants = {
         "received",
         "shipped",
         "invoice",
+        "tested",
       ],
       message_status: ["logged", "sent", "failed"],
       photo_kind: ["customer", "bench"],

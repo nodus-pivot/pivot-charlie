@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { PageBand } from "@/components/layout/page-band";
 import { Chip } from "@/components/ui/chip";
 import type { CurrentUser } from "@/features/auth/queries";
-import { canActOn, isAdminOf } from "@/features/pipeline";
+import { canActOn, isAdminOf, type Step } from "@/features/pipeline";
+import { EMAIL_KIND_LABELS, type EmailKind } from "@/features/mail/templates";
 import { daysBetween, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { TicketDetail } from "../detail";
@@ -33,7 +34,7 @@ export function summaryInput(detail: TicketDetail): SummaryInput {
     steps: detail.steps,
     tests: detail.tests,
     test_attempt: t.test_attempt,
-    messages: detail.messages.map((m) => ({ channel: m.channel, kind: m.kind, created_at: m.created_at, reply_count: m.reply_count })),
+    messages: detail.messages.map((m) => ({ channel: m.channel, kind: m.kind, created_at: m.created_at, reply_count: m.reply_count, status: m.status })),
   };
 }
 
@@ -84,6 +85,10 @@ export function TicketFrame({
     comments: detail.events
       .filter((e) => e.type === "comment" && e.body)
       .map((e) => ({ id: e.id, actor: e.actor_name ?? "Someone", date: formatDate(e.created_at), body: e.body! })),
+    emails: detail.messages
+      .filter((m) => m.channel === "email")
+      .map((m) => ({ id: m.id, label: EMAIL_KIND_LABELS[m.kind as EmailKind] ?? m.kind, date: formatDate(m.created_at), status: m.status, error: m.error })),
+    canResend: editable || canActOn(user.grants, t.stage as Step, t.workspace_id, t.brand_id),
   };
 
   return (

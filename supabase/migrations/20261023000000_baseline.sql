@@ -21,7 +21,7 @@ create type photo_kind as enum ('customer', 'bench');
 create type sheet_row_status as enum ('imported', 'dismissed');
 create type writeback_status as enum ('pending', 'done', 'failed');
 create type message_channel as enum ('slack', 'email');
-create type message_kind as enum ('parts_needed', 'cannot_replicate', 'received', 'shipped', 'invoice');
+create type message_kind as enum ('parts_needed', 'cannot_replicate', 'received', 'shipped', 'invoice', 'tested');
 create type message_status as enum ('logged', 'sent', 'failed');
 create type invoice_status as enum ('open', 'paid', 'void', 'expired');
 
