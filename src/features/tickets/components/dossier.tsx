@@ -204,7 +204,7 @@ function EmailLine({ number, email, canResend }: { number: string; email: Dossie
             <span><span className="text-ink-2">{email.status === "sent" ? "Sent" : "Written"}</span> {email.date}</span>
             <span><span className="text-ink-2">Subject</span> {email.subject}</span>
           </div>
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-ink-2">{email.body}</pre>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-ink-2 [overflow-wrap:anywhere]">{email.body}</pre>
           {email.status === "failed" && email.error ? <span className="text-coral">{email.error}</span> : null}
           <span className="flex flex-wrap items-center gap-3">
             {email.gmailUrl ? (
