@@ -5,7 +5,7 @@ import { Chip } from "@/components/ui/chip";
 import type { CurrentUser } from "@/features/auth/queries";
 import { canActOn, isAdminOf, type Step } from "@/features/pipeline";
 import { EMAIL_KIND_LABELS, type EmailKind } from "@/features/mail/templates";
-import { daysBetween, formatDate } from "@/lib/format";
+import { daysBetween, formatDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { TicketDetail } from "../detail";
 import { closedRows, parkedState, statusWord, stepOf, stepRows, type SummaryInput } from "../summary";
@@ -87,7 +87,17 @@ export function TicketFrame({
       .map((e) => ({ id: e.id, actor: e.actor_name ?? "Someone", date: formatDate(e.created_at), body: e.body! })),
     emails: detail.messages
       .filter((m) => m.channel === "email")
-      .map((m) => ({ id: m.id, label: EMAIL_KIND_LABELS[m.kind as EmailKind] ?? m.kind, date: formatDate(m.created_at), status: m.status, error: m.error })),
+      .map((m) => ({
+        id: m.id,
+        label: EMAIL_KIND_LABELS[m.kind as EmailKind] ?? m.kind,
+        date: `${formatDate(m.created_at)} · ${formatTime(m.created_at)}`,
+        status: m.status,
+        error: m.error,
+        to: m.recipient ?? "",
+        subject: m.subject ?? "",
+        body: m.body,
+        gmailUrl: m.status === "sent" && m.external_id ? `https://mail.google.com/mail/u/0/#search/rfc822msgid:${encodeURIComponent(m.external_id.replace(/^<|>$/g, ""))}` : null,
+      })),
     canResend: editable || canActOn(user.grants, t.stage as Step, t.workspace_id, t.brand_id),
   };
 

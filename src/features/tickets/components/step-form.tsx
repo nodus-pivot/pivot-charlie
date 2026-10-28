@@ -270,7 +270,7 @@ export function StepForm(p: StepFormProps) {
             {p.stage === "supply" ? "Request parts on Slack" : "Tell Nodus on Slack"}
           </Button>
           <span className="text-[13px] text-ink-3">
-            {p.stage === "supply" ? `Posts to ${p.slackChannel ?? "Slack"} with your inspection comments attached. The ticket waits here until the parts arrive.` : notes.trim() ? `Posts your comments to ${p.slackChannel ?? "Slack"} so customer service can follow up.` : "Write what you found above, then tell Nodus."}
+            {p.stage === "supply" ? "Posts to Slack with your inspection comments attached. The ticket waits here until the parts arrive." : notes.trim() ? "Posts your comments to Slack so customer service can follow up." : "Write what you found above, then tell Nodus."}
           </span>
         </div>
       ) : null}

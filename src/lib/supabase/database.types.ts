@@ -313,14 +313,14 @@ export type Database = {
           checked_at: string | null
           created_at: string
           created_by: string | null
-          due_at: string
+          due_at: string | null
           error: string | null
-          hosted_url: string
+          hosted_url: string | null
           id: string
           paid_at: string | null
           status: Database["public"]["Enums"]["invoice_status"]
-          stripe_customer_id: string
-          stripe_invoice_id: string
+          stripe_customer_id: string | null
+          stripe_invoice_id: string | null
           ticket_id: string
           voided_at: string | null
         }
@@ -329,14 +329,14 @@ export type Database = {
           checked_at?: string | null
           created_at?: string
           created_by?: string | null
-          due_at: string
+          due_at?: string | null
           error?: string | null
-          hosted_url: string
+          hosted_url?: string | null
           id?: string
           paid_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
-          stripe_customer_id: string
-          stripe_invoice_id: string
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string | null
           ticket_id: string
           voided_at?: string | null
         }
@@ -345,14 +345,14 @@ export type Database = {
           checked_at?: string | null
           created_at?: string
           created_by?: string | null
-          due_at?: string
+          due_at?: string | null
           error?: string | null
-          hosted_url?: string
+          hosted_url?: string | null
           id?: string
           paid_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
-          stripe_customer_id?: string
-          stripe_invoice_id?: string
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string | null
           ticket_id?: string
           voided_at?: string | null
         }
@@ -887,7 +887,13 @@ export type Database = {
     }
     Enums: {
       coverage: "warranty" | "paid"
-      invoice_status: "open" | "paid" | "void" | "expired"
+      invoice_status:
+        | "creating"
+        | "open"
+        | "paid"
+        | "void"
+        | "expired"
+        | "failed"
       member_role: "owner" | "admin" | "brand_rep" | "watchmaker"
       message_channel: "slack" | "email"
       message_kind:
@@ -1041,7 +1047,7 @@ export const Constants = {
   public: {
     Enums: {
       coverage: ["warranty", "paid"],
-      invoice_status: ["open", "paid", "void", "expired"],
+      invoice_status: ["creating", "open", "paid", "void", "expired", "failed"],
       member_role: ["owner", "admin", "brand_rep", "watchmaker"],
       message_channel: ["slack", "email"],
       message_kind: [

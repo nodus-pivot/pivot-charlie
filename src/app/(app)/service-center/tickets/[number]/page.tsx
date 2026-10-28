@@ -49,8 +49,8 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
     // Back goes to the last step actually worked, never into a skipped one.
     const backTo = [...STEPS].slice(0, STEPS.indexOf(stage)).reverse().find((x) => !stepOf(detail, x)?.skipped) ?? null;
     const shippedEmail = detail.messages.find((m) => m.channel === "email" && m.kind === "shipped") ?? null;
-    // The open invoice, else the newest one (paid, expired or voided).
-    const invoice = detail.invoices.find((i) => i.status === "open") ?? detail.invoices[0] ?? null;
+    // The live invoice (open, or still being created), else the newest one (paid, expired, voided or failed).
+    const invoice = detail.invoices.find((i) => i.status === "open" || i.status === "creating") ?? detail.invoices[0] ?? null;
     const shipTo = t.return_to_everett ? (ws.current?.fulfillment_address as Address | null) : t.ship_to;
     step = (
       <StepForm
@@ -66,7 +66,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         needsPayment={t.needs_payment}
         issue={t.issue}
         inspectNotes={stepOf(detail, "inspect")?.notes ?? null}
-        payment={{ amount: t.payment_amount, invoice: invoice ? { status: invoice.status, url: invoice.hosted_url, sentAt: invoice.created_at, dueAt: invoice.due_at, paidAt: invoice.paid_at, voidedAt: invoice.voided_at, dueText: dueText(invoice.due_at) } : null }}
+        payment={{ amount: t.payment_amount, invoice: invoice ? { status: invoice.status, url: invoice.hosted_url, sentAt: invoice.created_at, dueAt: invoice.due_at, paidAt: invoice.paid_at, voidedAt: invoice.voided_at, error: invoice.error, dueText: invoice.due_at ? dueText(invoice.due_at) : "" } : null }}
         tests={{
           attempt: t.test_attempt,
           passed: detail.tests.filter((x) => x.attempt === t.test_attempt && x.result === "pass").map((x) => x.kind as TestKind),

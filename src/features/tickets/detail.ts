@@ -120,7 +120,7 @@ const INVOICE_TTL_MS = 2 * 60_000;
  */
 async function syncInvoices(supabase: Awaited<ReturnType<typeof createClient>>, rows: InvoiceRow[]): Promise<InvoiceRow[]> {
   const open = rows.find((i) => i.status === "open");
-  if (!open) return rows;
+  if (!open?.stripe_invoice_id) return rows;
   const now = Date.now();
   if (open.checked_at && now - new Date(open.checked_at).getTime() < INVOICE_TTL_MS) return rows;
   const checked = new Date(now).toISOString();
@@ -132,7 +132,7 @@ async function syncInvoices(supabase: Awaited<ReturnType<typeof createClient>>, 
       const r = await fetchInvoice(open.stripe_invoice_id);
       if (r.status === "paid") patch = { status: "paid", paid_at: r.paidAt, checked_at: checked, error: null };
       else if (r.status === "void") patch = { status: "void", voided_at: checked, checked_at: checked, error: null };
-      else if (new Date(open.due_at).getTime() < now) patch = { status: "expired", checked_at: checked, error: null };
+      else if (open.due_at && new Date(open.due_at).getTime() < now) patch = { status: "expired", checked_at: checked, error: null };
       else patch = { checked_at: checked, error: null };
     } catch (e) {
       patch = { checked_at: checked, error: stripeError(e) };

@@ -285,8 +285,8 @@ export async function resendEmail(ticketNumber: string, messageId: string): Prom
   const kind = m.kind as EmailKind;
   let extra: { url: string; amount: number; dueAt: string } | undefined;
   if (kind === "invoice") {
-    const { data: inv } = await t.supabase.from("ticket_invoices").select("hosted_url, amount, due_at").eq("ticket_id", t.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (!inv) return { ok: false, error: "No invoice to send." };
+    const { data: inv } = await t.supabase.from("ticket_invoices").select("hosted_url, amount, due_at").eq("ticket_id", t.id).not("hosted_url", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!inv?.hosted_url || !inv.due_at) return { ok: false, error: "No invoice to send." };
     extra = { url: inv.hosted_url, amount: inv.amount, dueAt: inv.due_at };
   }
   const e = await emailData(t, extra);
@@ -437,28 +437,36 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
   if (!ticket) return { ok: false, error: "Ticket not found." };
   if (!ticket.customer_email) return { ok: false, error: "The customer needs an email address first." };
   if (ticket.payment_amount == null || ticket.payment_amount <= 0) return { ok: false, error: "Enter the repair cost first." };
-  const { data: open } = await t.supabase.from("ticket_invoices").select("id").eq("ticket_id", t.id).eq("status", "open").limit(1);
-  if (open?.length) return { ok: false, error: "There's already an open invoice on this ticket." };
+  // Step one: claim the ticket's one live invoice slot. The partial unique index
+  // (creating, open) turns a double click or a second person into a clean refusal
+  // before Stripe is ever called.
+  const { data: row, error: claimError } = await t.supabase
+    .from("ticket_invoices")
+    .insert({ ticket_id: t.id, amount: ticket.payment_amount, stripe_customer_id: ticket.stripe_customer_id, status: "creating", created_by: t.userId })
+    .select("id")
+    .single();
+  if (claimError || !row) {
+    if (claimError?.code === "23505") return { ok: false, error: "There's already an open invoice on this ticket." };
+    return { ok: false, error: claimError ? message(claimError) : "Could not start the invoice." };
+  }
 
+  // Step two: Stripe. On refusal the row stays as `failed` with the reason and frees the slot.
   let customer = ticket.stripe_customer_id;
   let created: Awaited<ReturnType<typeof createInvoice>>;
   try {
     customer ??= await findOrCreateCustomer(ticket.customer_name, ticket.customer_email);
     created = await createInvoice(customer, ticket.payment_amount, `${t.number} · ${ticket.watch} repair`, t.number);
   } catch (e) {
-    return { ok: false, error: `Stripe refused: ${stripeError(e)}` };
+    const reason = stripeError(e);
+    await t.supabase.from("ticket_invoices").update({ status: "failed", error: reason, checked_at: new Date().toISOString() }).eq("id", row.id);
+    refresh(ticketNumber);
+    return { ok: false, error: `Stripe refused: ${reason}` };
   }
   if (customer !== ticket.stripe_customer_id) await t.supabase.from("tickets").update({ stripe_customer_id: customer }).eq("id", t.id);
-  const { error } = await t.supabase.from("ticket_invoices").insert({
-    ticket_id: t.id,
-    stripe_customer_id: customer,
-    stripe_invoice_id: created.id,
-    hosted_url: created.url,
-    amount: ticket.payment_amount,
-    due_at: created.dueAt,
-    checked_at: new Date().toISOString(),
-    created_by: t.userId,
-  });
+  const { error } = await t.supabase
+    .from("ticket_invoices")
+    .update({ status: "open", stripe_customer_id: customer, stripe_invoice_id: created.id, hosted_url: created.url, due_at: created.dueAt, checked_at: new Date().toISOString(), error: null })
+    .eq("id", row.id);
   if (error) return { ok: false, error: message(error) };
   await emailTicket(t, "invoice", { url: created.url, amount: ticket.payment_amount, dueAt: created.dueAt });
   refresh(ticketNumber);
@@ -471,7 +479,7 @@ export async function voidInvoice(ticketNumber: string): Promise<ActionResult> {
   if (!t.ok) return t;
   if (!stripeConfigured()) return { ok: false, error: "Stripe isn't set up on this server yet." };
   const { data: open } = await t.supabase.from("ticket_invoices").select("id, stripe_invoice_id").eq("ticket_id", t.id).eq("status", "open").maybeSingle();
-  if (!open) return { ok: false, error: "There's no open invoice to void. Reload." };
+  if (!open?.stripe_invoice_id) return { ok: false, error: "There's no open invoice to void. Reload." };
   if (!open.stripe_invoice_id.startsWith("in_seed")) {
     try {
       await voidStripeInvoice(open.stripe_invoice_id);

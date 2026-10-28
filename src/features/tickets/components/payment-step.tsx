@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowSquareOut, CheckCircle, Clock, Copy, CurrencyDollar, Prohibit, Receipt, WarningCircle } from "@phosphor-icons/react";
+import { ArrowSquareOut, CheckCircle, CircleNotch, Clock, Copy, CurrencyDollar, Prohibit, Receipt, WarningCircle } from "@phosphor-icons/react";
 import { BigTick } from "@/components/ui/big-tick";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type InvoiceView = {
-  status: "open" | "paid" | "void" | "expired";
-  url: string;
+  status: "creating" | "open" | "paid" | "void" | "expired" | "failed";
+  /** Stripe's hosted pay page; null while creating or after a failure. */
+  url: string | null;
   sentAt: string;
-  dueAt: string;
+  dueAt: string | null;
   paidAt: string | null;
   voidedAt: string | null;
+  /** Why Stripe refused, on a failed row. */
+  error: string | null;
   /** "due in 6 days" · "due today" · "2 days overdue", worked out when the page rendered. */
   dueText: string;
 };
@@ -21,7 +24,8 @@ export type InvoiceView = {
  * D6: three cards (cost · invoice · status) and the Payment received tick.
  * The cost is typed in place; the invoice card sends a Stripe invoice and
  * then shows when it went out, when it is due, the pay link to copy, and
- * Void. A voided or expired invoice unlocks the cost and offers a new one.
+ * Void. A voided, expired or failed invoice unlocks the cost and offers a
+ * new one.
  */
 export function PaymentStep({
   amount,
@@ -37,7 +41,7 @@ export function PaymentStep({
   amount: string;
   onAmount: (v: string) => void;
   onAmountBlur: () => void;
-  /** The open invoice, else the newest one; null before the first is sent. */
+  /** The live invoice, else the newest one; null before the first is sent. */
   invoice: InvoiceView | null;
   onSendInvoice: () => void;
   onVoidInvoice: () => void;
@@ -45,8 +49,8 @@ export function PaymentStep({
   onPaidToggle: () => void;
   disabled: boolean;
 }) {
-  const active = invoice && (invoice.status === "open" || invoice.status === "paid") ? invoice : null;
-  const canSend = !active && !disabled && Number(amount) > 0;
+  const live = invoice && (invoice.status === "open" || invoice.status === "paid" || invoice.status === "creating") ? invoice : null;
+  const canSend = !live && !disabled && Number(amount) > 0;
   return (
     <>
       <div className="grid gap-2.5 sm:grid-cols-3">
@@ -58,7 +62,7 @@ export function PaymentStep({
               value={amount}
               onChange={(e) => onAmount(e.target.value.replace(/[^\d.]/g, ""))}
               onBlur={onAmountBlur}
-              disabled={disabled || !!active}
+              disabled={disabled || !!live}
               inputMode="decimal"
               placeholder="0.00"
               aria-label="Repair cost"
@@ -67,12 +71,16 @@ export function PaymentStep({
           </span>
         </Card>
         <Card label="Invoice">
-          {active ? (
-            <InvoiceLine invoice={active} onVoid={active.status === "open" ? onVoidInvoice : null} disabled={disabled} />
+          {live?.status === "creating" ? (
+            <span className="flex items-center gap-2 text-[16px] text-ink-2">
+              <CircleNotch size={16} className="shrink-0 animate-spin text-gold" aria-hidden /> Sending invoice…
+            </span>
+          ) : live ? (
+            <InvoiceLine invoice={live} onVoid={live.status === "open" ? onVoidInvoice : null} disabled={disabled} />
           ) : (
             <button type="button" disabled={!canSend} onClick={onSendInvoice} className="flex items-center gap-2 text-left text-[16px] text-ink transition-colors hover:text-gold-light disabled:cursor-default disabled:text-ink-3 disabled:hover:text-ink-3">
               <Receipt size={16} className="shrink-0" aria-hidden />
-              {invoice ? "Send a new invoice" : "Send invoice"}
+              {invoice?.status === "failed" ? "Try again" : invoice ? "Send a new invoice" : "Send invoice"}
             </button>
           )}
         </Card>
@@ -80,7 +88,7 @@ export function PaymentStep({
           <StatusLine paid={paid} invoice={invoice} />
         </Card>
       </div>
-      <BigTick on={paid} onToggle={onPaidToggle} label="Payment received" hint={active?.status === "open" ? "Ticks itself when Stripe says the invoice is paid. Tick it yourself for cash or a check." : "Tick when the customer has paid. Warranty repairs skip this step."} disabled={disabled} />
+      <BigTick on={paid} onToggle={onPaidToggle} label="Payment received" hint={live?.status === "open" ? "Ticks itself when Stripe says the invoice is paid. Tick it yourself for cash or a check." : "Tick when the customer has paid. Warranty repairs skip this step."} disabled={disabled} />
     </>
   );
 }
@@ -88,13 +96,15 @@ export function PaymentStep({
 function InvoiceLine({ invoice, onVoid, disabled }: { invoice: InvoiceView; onVoid: (() => void) | null; disabled: boolean }) {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const url = invoice.url;
   async function copy() {
+    if (!url) return;
     try {
-      await navigator.clipboard.writeText(invoice.url);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      window.prompt("Copy the pay link", invoice.url);
+      window.prompt("Copy the pay link", url);
     }
   }
   return (
@@ -111,12 +121,16 @@ function InvoiceLine({ invoice, onVoid, disabled }: { invoice: InvoiceView; onVo
         </span>
       ) : (
         <span className="flex items-center gap-3 text-[12px] text-ink-3">
-          <button type="button" onClick={copy} className="inline-flex items-center gap-1 transition-colors hover:text-ink">
-            <Copy size={12} aria-hidden /> {copied ? "Copied" : "Copy pay link"}
-          </button>
-          <a href={invoice.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition-colors hover:text-ink">
-            <ArrowSquareOut size={12} aria-hidden /> Open
-          </a>
+          {url ? (
+            <>
+              <button type="button" onClick={copy} className="inline-flex items-center gap-1 transition-colors hover:text-ink">
+                <Copy size={12} aria-hidden /> {copied ? "Copied" : "Copy pay link"}
+              </button>
+              <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition-colors hover:text-ink">
+                <ArrowSquareOut size={12} aria-hidden /> Open
+              </a>
+            </>
+          ) : null}
           {onVoid ? (
             <button type="button" disabled={disabled} onClick={() => setConfirming(true)} className="inline-flex items-center gap-1 transition-colors hover:text-coral disabled:opacity-60">
               <Prohibit size={12} aria-hidden /> Void
@@ -137,11 +151,27 @@ function StatusLine({ paid, invoice }: { paid: boolean; invoice: InvoiceView | n
       </>
     );
   }
+  if (invoice?.status === "creating") {
+    return (
+      <>
+        <Clock size={16} className="shrink-0 text-gold" aria-hidden />
+        <span className="text-ink">Creating the invoice at Stripe</span>
+      </>
+    );
+  }
   if (invoice?.status === "open") {
     return (
       <>
         <Clock size={16} className="shrink-0 text-gold" aria-hidden />
         <span className="text-ink">Awaiting payment · {invoice.dueText}</span>
+      </>
+    );
+  }
+  if (invoice?.status === "failed") {
+    return (
+      <>
+        <WarningCircle size={16} className="shrink-0 text-coral" aria-hidden />
+        <span className="min-w-0 truncate text-coral" title={invoice.error ?? undefined}>Stripe refused{invoice.error ? ` · ${invoice.error}` : ""}</span>
       </>
     );
   }

@@ -23,7 +23,7 @@ create type writeback_status as enum ('pending', 'done', 'failed');
 create type message_channel as enum ('slack', 'email');
 create type message_kind as enum ('parts_needed', 'cannot_replicate', 'received', 'shipped', 'invoice', 'tested');
 create type message_status as enum ('logged', 'sent', 'failed');
-create type invoice_status as enum ('open', 'paid', 'void', 'expired');
+create type invoice_status as enum ('creating', 'open', 'paid', 'void', 'expired', 'failed');
 
 -- ================================================================ helpers
 create or replace function app.set_updated_at() returns trigger
@@ -211,27 +211,31 @@ create table ticket_messages (
   created_at timestamptz not null default now()
 );
 create index ticket_messages_ticket on ticket_messages (ticket_id, created_at);
+-- Received, tested and shipped go to the customer once per ticket, whatever happens upstream.
+create unique index one_email_per_kind on ticket_messages (ticket_id, kind) where channel = 'email' and kind in ('received', 'tested', 'shipped');
 
--- Stripe invoices sent from the Payment step. One open invoice per ticket at
--- a time; paid, void and expired are final and a new row replaces them. The
--- ticket page asks Stripe for the open one's status when it loads.
+-- Stripe invoices sent from the Payment step. Two-step: the row is inserted
+-- as `creating` (claiming the ticket's one live slot through the partial
+-- unique index) before Stripe is called, then becomes `open` with the Stripe
+-- ids, or `failed` with the reason. Paid, void and expired are final; a new
+-- row replaces them. The ticket page asks Stripe for the open one's status.
 create table ticket_invoices (
   id uuid primary key default gen_random_uuid(),
   ticket_id uuid not null references tickets(id) on delete cascade,
-  stripe_customer_id text not null,
-  stripe_invoice_id text not null unique,
-  hosted_url text not null,
+  stripe_customer_id text,
+  stripe_invoice_id text unique,
+  hosted_url text,
   amount numeric(10,2) not null,
-  status invoice_status not null default 'open',
+  status invoice_status not null default 'creating',
   created_at timestamptz not null default now(),
-  due_at timestamptz not null,
+  due_at timestamptz,
   paid_at timestamptz,
   voided_at timestamptz,
   checked_at timestamptz,
   error text,
   created_by uuid references profiles(id)
 );
-create unique index one_open_invoice_per_ticket on ticket_invoices (ticket_id) where status = 'open';
+create unique index one_live_invoice_per_ticket on ticket_invoices (ticket_id) where status in ('creating', 'open');
 create index ticket_invoices_ticket on ticket_invoices (ticket_id, created_at);
 
 -- Time / Water / Looks per attempt. A Fail sends the ticket back to Repair and
@@ -970,7 +974,7 @@ select app.grant_columns_except('tickets', 'update',
   array['stage', 'closed_at', 'number', 'workspace_id', 'brand_id', 'source', 'sheet_row_id', 'test_attempt', 'created_by', 'created_at', 'updated_at', 'search']);
 select app.grant_columns_except('ticket_steps', 'update', array['ticket_id', 'stage', 'skipped', 'updated_at']);
 select app.grant_columns_except('ticket_messages', 'update', array['id', 'ticket_id', 'channel', 'kind', 'created_by', 'created_at']);
-select app.grant_columns_except('ticket_invoices', 'update', array['id', 'ticket_id', 'stripe_customer_id', 'stripe_invoice_id', 'hosted_url', 'amount', 'created_at', 'due_at', 'created_by']);
+select app.grant_columns_except('ticket_invoices', 'update', array['id', 'ticket_id', 'amount', 'created_at', 'created_by']);
 select app.grant_columns_except('profiles', 'update', array['id', 'email', 'is_active', 'created_at', 'updated_at']);
 select app.grant_columns_except('sheet_rows', 'update', array['id', 'workspace_id', 'fingerprint', 'raw', 'acted_by', 'created_at']);
 revoke insert on tickets from authenticated;  -- create_ticket() is the only door

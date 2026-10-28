@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
-import { ArrowCounterClockwise, Microphone } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowSquareOut, Microphone } from "@phosphor-icons/react";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { SoonIcon } from "@/components/ui/soon";
 import { Segmented } from "@/components/ui/segmented";
@@ -28,7 +28,7 @@ export type DossierData = {
   photos: { id: string; path: string; kind: "customer" | "bench" }[];
   comments: { id: string; actor: string; date: string; body: string }[];
   /** Customer emails on this ticket, oldest first. */
-  emails: { id: string; label: string; date: string; status: "logged" | "sent" | "failed"; error: string | null }[];
+  emails: { id: string; label: string; date: string; status: "logged" | "sent" | "failed"; error: string | null; to: string; subject: string; body: string; gmailUrl: string | null }[];
   canResend: boolean;
 };
 
@@ -182,31 +182,50 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
   );
 }
 
+/** One email on the ticket. Click the line to read it: to, when, subject, the text as sent, and Open in Gmail for the real thing. */
 function EmailLine({ number, email, canResend }: { number: string; email: DossierData["emails"][number]; canResend: boolean }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const tone = email.status === "sent" ? "text-green" : email.status === "failed" ? "text-coral" : "text-ink-3";
   const word = email.status === "sent" ? "sent" : email.status === "failed" ? "failed" : "logged";
   return (
-    <li className="flex flex-col gap-0.5 text-sm">
-      <span className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-ink-2">{email.label}</span>
-        <span className="text-xs text-ink-3">{email.date}</span>
+    <li className="flex flex-col gap-1 text-sm">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex flex-wrap items-baseline gap-x-2 text-left">
+        <span className="text-ink-2 underline-offset-2 hover:underline">{email.label}</span>
+        <span className="text-xs text-ink-3">{email.date.split(" · ")[0]}</span>
         <span className={cn("text-xs", tone)}>{word}</span>
-        {canResend && email.status !== "sent" ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => { setError(null); start(async () => { const r = await resendEmail(number, email.id); if (!r.ok) setError(r.error); else router.refresh(); }); }}
-            className="inline-flex items-center gap-1 text-xs text-ink-2 transition-colors hover:text-ink disabled:opacity-60"
-          >
-            <ArrowCounterClockwise size={12} aria-hidden /> {pending ? "Sending…" : "Send again"}
-          </button>
-        ) : null}
-      </span>
-      {email.status === "failed" && email.error ? <span className="truncate text-xs text-ink-3" title={email.error}>{email.error}</span> : null}
-      {error ? <span role="alert" className="text-xs text-coral">{error}</span> : null}
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-2 rounded-xs border border-rule bg-panel px-3 py-2.5 text-xs">
+          <div className="flex flex-col gap-0.5 text-ink-3">
+            <span><span className="text-ink-2">To</span> {email.to}</span>
+            <span><span className="text-ink-2">{email.status === "sent" ? "Sent" : "Written"}</span> {email.date}</span>
+            <span><span className="text-ink-2">Subject</span> {email.subject}</span>
+          </div>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-ink-2">{email.body}</pre>
+          {email.status === "failed" && email.error ? <span className="text-coral">{email.error}</span> : null}
+          <span className="flex flex-wrap items-center gap-3">
+            {email.gmailUrl ? (
+              <a href={email.gmailUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-ink-2 transition-colors hover:text-ink">
+                <ArrowSquareOut size={12} aria-hidden /> Open in Gmail
+              </a>
+            ) : null}
+            {canResend && email.status !== "sent" ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => { setError(null); start(async () => { const r = await resendEmail(number, email.id); if (!r.ok) setError(r.error); else router.refresh(); }); }}
+                className="inline-flex items-center gap-1 text-ink-2 transition-colors hover:text-ink disabled:opacity-60"
+              >
+                <ArrowCounterClockwise size={12} aria-hidden /> {pending ? "Sending…" : "Send again"}
+              </button>
+            ) : null}
+          </span>
+          {error ? <span role="alert" className="text-coral">{error}</span> : null}
+        </div>
+      ) : null}
     </li>
   );
 }
