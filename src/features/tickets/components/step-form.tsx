@@ -322,6 +322,22 @@ export function StepForm(p: StepFormProps) {
           amount={amount}
           onAmount={setAmount}
           onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPaymentAmount(p.number, amount ? Number(amount) : null))}
+          memo={noteSpec ? (
+              <label className="flex flex-col gap-2">
+                <span className="text-[11px] uppercase tracking-label text-ink-3">{noteSpec.label}</span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onBlur={blurNotes}
+                  disabled={!p.canAct || invoiceLive}
+                  rows={4}
+                  maxLength={500}
+                  placeholder={noteSpec.placeholder}
+                  className="min-h-24 w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none disabled:text-ink-2"
+                />
+                <span className="text-[12px] text-ink-3">{invoiceLive ? "On the invoice that went out. Void it to change the memo." : "Shown on the Stripe invoice and in the payment email. Written for the customer, not bench notes."}</span>
+              </label>
+          ) : null}
           invoice={p.payment.invoice}
           onSendInvoice={() => run(async () => {
             if (notes !== p.notes) {
@@ -335,23 +351,6 @@ export function StepForm(p: StepFormProps) {
           onPaidToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }}
           disabled={!p.canAct || pending}
         />
-      ) : null}
-
-      {p.stage === "payment" && noteSpec ? (
-        <label className="flex flex-col gap-2">
-          <span className="text-[11px] uppercase tracking-label text-ink-3">{noteSpec.label}</span>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={blurNotes}
-            disabled={!p.canAct || invoiceLive}
-            rows={4}
-            maxLength={500}
-            placeholder={noteSpec.placeholder}
-            className="min-h-24 w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none disabled:text-ink-2"
-          />
-          <span className="text-[12px] text-ink-3">{invoiceLive ? "On the invoice that went out. Void it to change the memo." : "Shown on the Stripe invoice and in the payment email. Written for the customer, not bench notes."}</span>
-        </label>
       ) : null}
 
       {p.stage === "ship" ? (

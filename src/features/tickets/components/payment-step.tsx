@@ -21,16 +21,18 @@ export type InvoiceView = {
 };
 
 /**
- * D6: three cards (cost · invoice · status) and the Payment received tick.
- * The cost is typed in place; the invoice card sends a Stripe invoice and
- * then shows when it went out, when it is due, the pay link to copy, and
- * Void. A voided, expired or failed invoice unlocks the cost and offers a
- * new one.
+ * D6, top to bottom: the repair cost and the customer memo (what goes on
+ * the invoice), then the invoice and status cards, then the Payment
+ * received tick. The cost is typed in place; the invoice card sends a
+ * Stripe invoice and then shows when it went out, when it is due, the pay
+ * link to copy, and Void. A voided, expired or failed invoice unlocks the
+ * cost and the memo and offers a new one.
  */
 export function PaymentStep({
   amount,
   onAmount,
   onAmountBlur,
+  memo,
   invoice,
   onSendInvoice,
   onVoidInvoice,
@@ -41,6 +43,8 @@ export function PaymentStep({
   amount: string;
   onAmount: (v: string) => void;
   onAmountBlur: () => void;
+  /** The "Memo for the customer" field, rendered under the cost. */
+  memo: React.ReactNode;
   /** The live invoice, else the newest one; null before the first is sent. */
   invoice: InvoiceView | null;
   onSendInvoice: () => void;
@@ -70,6 +74,9 @@ export function PaymentStep({
             />
           </span>
         </Card>
+      </div>
+      {memo}
+      <div className="grid gap-2.5 sm:grid-cols-2">
         <Card label="Invoice">
           {live?.status === "creating" ? (
             <span className="flex items-center gap-2 text-[16px] text-ink-2">
