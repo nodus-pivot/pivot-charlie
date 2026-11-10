@@ -169,7 +169,7 @@ create trigger tickets_updated_at before update on tickets
 -- One row per step per ticket, created with the ticket. The meaning of
 -- `answer` and `notes` per step:
 --   check_in  answer = I have the watch                    done = received
---   inspect   answer = reported issue present (No parks)   notes = comments
+--   inspect   answer = reported issue present (No parks)   notes = comments (optional)
 --   supply    answer = have the parts (No = list + Slack)  notes = parts list   done = had or received
 --   repair    answer = repair complete                     notes = what you did
 --   test      answer = all three pass (ticket_tests)       notes = test notes
@@ -564,7 +564,6 @@ begin
   elsif t.stage = 'inspect' then
     if s.answer is null then raise exception 'answer "Is the reported issue present?" first'; end if;
     if not s.answer then raise exception 'parked: pick Yes to continue, or skip to Ship'; end if;
-    if coalesce(trim(s.notes), '') = '' then raise exception 'add your inspection comments first'; end if;
   elsif t.stage = 'supply' then
     if s.answer is null then raise exception 'answer "Do you have the parts?" first'; end if;
     if not s.answer and s.done_at is null then raise exception 'tick "Parts received" once everything is on the bench'; end if;
@@ -656,7 +655,6 @@ begin
   if t.stage <> 'inspect' then raise exception 'skip to Ship is only offered on Inspect'; end if;
   if not app.can_act_on('inspect', t.workspace_id, t.brand_id) then raise exception 'your role does not own the inspect step'; end if;
   select * into s from ticket_steps where ticket_id = p_ticket and stage = 'inspect';
-  if coalesce(trim(s.notes), '') = '' then raise exception 'add your inspection comments first'; end if;
 
   perform app.mark_step_done(p_ticket, 'inspect', false);
   perform app.mark_step_done(p_ticket, 'supply', true);

@@ -160,10 +160,7 @@ export function StepForm(p: StepFormProps) {
   // What still blocks the primary button, mirrored from advance()'s gates.
   const left: string[] = [];
   if (p.stage === "check_in" && !answer) left.push("tick “I have the watch”");
-  if (p.stage === "inspect") {
-    if (answer === null) left.push("answer yes or no");
-    if (!notes.trim()) left.push("add comments");
-  }
+  if (p.stage === "inspect" && answer === null) left.push("answer yes or no");
   if (p.stage === "supply" && answer === null) left.push("answer yes or no");
   if (p.stage === "supply" && answer === false && !received) left.push(p.slack ? "parts received" : "request or confirm parts");
   if (p.stage === "repair" && !answer) left.push("tick “Repair complete”");
@@ -359,7 +356,7 @@ export function StepForm(p: StepFormProps) {
         extra={
           <>
             {p.stage === "inspect" && answer === false ? (
-              <button type="button" disabled={pending || !notes.trim()} onClick={() => run(() => skipToShip(p.number))} className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
+              <button type="button" disabled={pending} onClick={() => run(() => skipToShip(p.number))} className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 transition-colors hover:text-ink disabled:opacity-60">
                 <Package size={14} aria-hidden /> Nothing wrong · skip to Ship
               </button>
             ) : null}

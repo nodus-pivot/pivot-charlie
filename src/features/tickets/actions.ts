@@ -9,6 +9,7 @@ import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
 import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
+import { invoiceDescription } from "@/features/tickets/invoice";
 import { createInvoice, fetchInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
 import { resendTicketEmail, sendTicketEmail, statusUrl } from "@/features/mail/send";
 import type { EmailKind, TicketEmailData } from "@/features/mail/templates";
@@ -433,7 +434,10 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
   const t = await loadForStep(ticketNumber, "payment");
   if (!t.ok) return t;
   if (!stripeConfigured()) return { ok: false, error: "Stripe isn't set up on this server yet." };
-  const { data: ticket } = await t.supabase.from("tickets").select("customer_name, customer_email, watch, payment_amount, stripe_customer_id").eq("id", t.id).single();
+  const [{ data: ticket }, { data: steps }] = await Promise.all([
+    t.supabase.from("tickets").select("customer_name, customer_email, watch, issue, payment_amount, stripe_customer_id").eq("id", t.id).single(),
+    t.supabase.from("ticket_steps").select("stage, notes").eq("ticket_id", t.id).in("stage", ["inspect", "supply", "repair"]),
+  ]);
   if (!ticket) return { ok: false, error: "Ticket not found." };
   if (!ticket.customer_email) return { ok: false, error: "The customer needs an email address first." };
   if (ticket.payment_amount == null || ticket.payment_amount <= 0) return { ok: false, error: "Enter the repair cost first." };
@@ -455,7 +459,7 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
   let created: Awaited<ReturnType<typeof createInvoice>>;
   try {
     customer ??= await findOrCreateCustomer(ticket.customer_name, ticket.customer_email);
-    created = await createInvoice(customer, ticket.payment_amount, `${t.number} · ${ticket.watch} repair`, t.number);
+    created = await createInvoice(customer, ticket.payment_amount, invoiceDescription(t.number, ticket, steps ?? []), t.number);
   } catch (e) {
     const reason = stripeError(e);
     await t.supabase.from("ticket_invoices").update({ status: "failed", error: reason, checked_at: new Date().toISOString() }).eq("id", row.id);
