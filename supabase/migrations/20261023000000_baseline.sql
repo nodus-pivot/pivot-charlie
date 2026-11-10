@@ -601,7 +601,7 @@ begin
   end if;
 
   if t.stage = 'inspect' then
-    perform app.queue_writeback(p_ticket, 'Solution', left(s.notes, 2000));
+    if coalesce(trim(s.notes), '') <> '' then perform app.queue_writeback(p_ticket, 'Solution', left(s.notes, 2000)); end if;
   elsif t.stage = 'repair' then
     perform app.queue_writeback(p_ticket, 'Repair Completed?', 'TRUE');
   elsif t.stage = 'ship' then
@@ -665,7 +665,7 @@ begin
   update tickets set stage = v_to where id = p_ticket;
   insert into ticket_events (ticket_id, type, actor_id, from_stage, to_stage, body)
   values (p_ticket, 'skipped', auth.uid(), 'inspect', v_to, 'Nothing wrong: skipped Supply, Repair and Test');
-  perform app.queue_writeback(p_ticket, 'Solution', 'Nothing wrong. ' || left(s.notes, 1900));
+  perform app.queue_writeback(p_ticket, 'Solution', rtrim('Nothing wrong. ' || coalesce(left(s.notes, 1900), '')));
   perform app.queue_writeback(p_ticket, 'Repair Completed?', 'TRUE');
   return v_to;
 end $$;
