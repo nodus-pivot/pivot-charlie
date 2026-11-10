@@ -321,7 +321,13 @@ export function StepForm(p: StepFormProps) {
         <PaymentStep
           amount={amount}
           onAmount={setAmount}
-          onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPaymentAmount(p.number, amount ? Number(amount) : null))}
+          onAmountBlur={() => {
+            if (!p.canAct || amount === (p.payment.amount?.toString() ?? "")) return;
+            save(async () => {
+              const r = await setPaymentAmount(p.number, amount ? Number(amount) : null);
+              if (!r.ok) setError(r.error);
+            });
+          }}
           memo={noteSpec ? (
               <label className="flex flex-col gap-2">
                 <span className="text-[11px] uppercase tracking-label text-ink-3">{noteSpec.label}</span>
@@ -349,7 +355,9 @@ export function StepForm(p: StepFormProps) {
           onVoidInvoice={() => run(() => voidInvoice(p.number))}
           paid={!!answer}
           onPaidToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }}
-          disabled={!p.canAct || pending}
+          // Blur saves (memo, cost) must not grey the step: clicking Send blurs the field first, and a
+          // disabled button would swallow that click. Send saves the memo itself before calling Stripe.
+          disabled={!p.canAct || acting}
         />
       ) : null}
 
