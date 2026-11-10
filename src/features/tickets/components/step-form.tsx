@@ -39,6 +39,8 @@ export type StepFormProps = {
   needsPayment: boolean;
   issue: string | null;
   inspectNotes: string | null;
+  /** The Repair step's "what you did": the starting draft for the Payment memo. */
+  repairNotes: string | null;
   customer: string;
   watch: string;
   payment: { amount: number | null; invoice: InvoiceView | null };
@@ -57,6 +59,7 @@ const NOTES: Partial<Record<Step, { label: string; placeholder: string }>> = {
   supply: { label: "Parts you need · one per line", placeholder: "1× Dial, Sector GMT (black)" },
   repair: { label: "What you did", placeholder: "Replaced crown tube and signed crown…" },
   test: { label: "Test notes", placeholder: "+2 s/d dial up, amplitude 280°. 200 m pass." },
+  payment: { label: "Memo for the customer", placeholder: "Replaced the sapphire crystal and cleaned the bezel. Pressure tested to 200 m." },
 };
 
 const PRIMARY: Record<Step, string> = {
@@ -72,7 +75,8 @@ const PRIMARY: Record<Step, string> = {
 export function StepForm(p: StepFormProps) {
   const router = useRouter();
   const [answer, setAnswer] = useState(p.answer);
-  const [notes, setNotes] = useState(p.notes);
+  // The Payment memo starts as a copy of the Repair notes until something is written.
+  const [notes, setNotes] = useState(p.notes || (p.stage === "payment" ? p.repairNotes ?? "" : ""));
   const [received, setReceived] = useState(!!p.doneAt);
   const [editingList, setEditingList] = useState(false);
   const [passed, setPassed] = useState<TestKind[]>(p.tests.passed);
@@ -169,6 +173,7 @@ export function StepForm(p: StepFormProps) {
   if (p.stage === "ship" && !ship.tracking.trim() && !ship.labelUrl.trim()) left.push("label or tracking");
   const parked = p.stage === "inspect" && answer === false;
   const canOverride = p.stage === "payment" && p.isAdmin && p.needsPayment && !answer;
+  const invoiceLive = p.stage === "payment" && !!p.payment.invoice && ["open", "paid", "creating"].includes(p.payment.invoice.status);
   const showSlack = (p.stage === "inspect" && answer === false) || (p.stage === "supply" && answer === false);
   const slackTitle = p.stage === "supply" ? "Parts needed" : "Cannot replicate reported issue";
   const slackParts = p.slack ? parseSlackBody(p.slack.body) : null;
@@ -216,7 +221,7 @@ export function StepForm(p: StepFormProps) {
         </Block>
       ) : null}
 
-      {noteSpec && p.stage !== "test" && (p.stage !== "supply" || (answer === false && !p.slack)) ? (
+      {noteSpec && p.stage !== "test" && p.stage !== "payment" && (p.stage !== "supply" || (answer === false && !p.slack)) ? (
         <label className="flex flex-col gap-2">
           <span className="text-[11px] uppercase tracking-label text-ink-3">{noteSpec.label}</span>
           <textarea
@@ -318,12 +323,35 @@ export function StepForm(p: StepFormProps) {
           onAmount={setAmount}
           onAmountBlur={() => p.canAct && amount !== (p.payment.amount?.toString() ?? "") && run(() => setPaymentAmount(p.number, amount ? Number(amount) : null))}
           invoice={p.payment.invoice}
-          onSendInvoice={() => run(() => sendInvoice(p.number))}
+          onSendInvoice={() => run(async () => {
+            if (notes !== p.notes) {
+              const saved = await setStepNotes(p.number, p.stage, notes);
+              if (!saved.ok) return saved;
+            }
+            return sendInvoice(p.number);
+          })}
           onVoidInvoice={() => run(() => voidInvoice(p.number))}
           paid={!!answer}
           onPaidToggle={() => { const v = !answer; setAnswer(v); run(() => setPaymentReceived(p.number, v)); }}
           disabled={!p.canAct || pending}
         />
+      ) : null}
+
+      {p.stage === "payment" && noteSpec ? (
+        <label className="flex flex-col gap-2">
+          <span className="text-[11px] uppercase tracking-label text-ink-3">{noteSpec.label}</span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={blurNotes}
+            disabled={!p.canAct || invoiceLive}
+            rows={4}
+            maxLength={500}
+            placeholder={noteSpec.placeholder}
+            className="min-h-24 w-full resize-y rounded-xs border border-border-strong bg-transparent px-3.5 py-3 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-ink-3 focus:border-gold focus-visible:outline-none disabled:text-ink-2"
+          />
+          <span className="text-[12px] text-ink-3">{invoiceLive ? "On the invoice that went out. Void it to change the memo." : "Shown on the Stripe invoice and in the payment email. Written for the customer, not bench notes."}</span>
+        </label>
       ) : null}
 
       {p.stage === "ship" ? (

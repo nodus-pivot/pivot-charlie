@@ -173,7 +173,7 @@ create trigger tickets_updated_at before update on tickets
 --   supply    answer = have the parts (No = list + Slack)  notes = parts list   done = had or received
 --   repair    answer = repair complete                     notes = what you did
 --   test      answer = all three pass (ticket_tests)       notes = test notes
---   payment   answer = payment received                    skipped = warranty
+--   payment   answer = payment received                    notes = memo for the customer (invoice)   skipped = warranty
 --   ship      done = shipped
 create table ticket_steps (
   ticket_id uuid not null references tickets(id) on delete cascade,

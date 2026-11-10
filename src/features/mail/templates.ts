@@ -8,8 +8,6 @@
  * Images are referenced by cid and attached by the sender (see send.ts).
  */
 
-import { repairLines } from "@/features/tickets/invoice";
-
 export type EmailKind = "received" | "tested" | "invoice" | "shipped";
 
 export type TicketEmailData = {
@@ -18,12 +16,8 @@ export type TicketEmailData = {
   customerName: string;
   /** The customer's words at intake (received). */
   issue?: string | null;
-  /** The Repair step's "what you did". With inspectNotes and partsNotes it builds the invoice's "What this covers". */
-  repairNotes?: string | null;
-  /** The Inspect step's comments (invoice). */
-  inspectNotes?: string | null;
-  /** The Supply step's parts list (invoice). */
-  partsNotes?: string | null;
+  /** The customer-facing memo from the Payment step (invoice: "What this covers"). */
+  memo?: string | null;
   amount?: number | null;
   payUrl?: string | null;
   dueAt?: string | null;
@@ -107,20 +101,18 @@ export function renderTicketEmail(kind: EmailKind, d: TicketEmailData): Rendered
           : "We’ll be in touch shortly with your tracking information once it ships. If you have any questions in the meantime, just reply to this email.",
         statusUrl: d.statusUrl,
       });
-    case "invoice": {
-      const covers = repairLines(d.issue, { inspect: d.inspectNotes, supply: d.partsNotes, repair: d.repairNotes });
+    case "invoice":
       return build({
         subject: `Payment request for your ${d.watch} repair — Ticket ${d.number}`,
         number: d.number,
         headline: `Payment needed for your ${d.watch}`,
         greeting: `Hi ${first},`,
         lead: [`Your repair comes to `, b(money), `. You can pay securely below and we’ll ship your `, d.watch, ` back right away.`, d.dueAt ? ` The link is good until ${longDate(d.dueAt)}.` : ""],
-        box: covers.length ? { label: "What this covers", text: covers.map((l) => clip(l, 200)).join("\n") } : null,
+        box: d.memo?.trim() ? { label: "What this covers", text: d.memo.trim() } : null,
         button: d.payUrl ? { label: "Pay now  →", url: d.payUrl } : null,
         close: "Once paid, we’ll have it on its way to you and send your tracking information. If you have any questions in the meantime, just reply to this email.",
         statusUrl: d.statusUrl,
       });
-    }
     case "shipped": {
       const track = trackingUrl(d.carrier, d.tracking);
       const number = (d.tracking ?? "").trim();

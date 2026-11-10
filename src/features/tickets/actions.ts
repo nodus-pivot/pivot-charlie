@@ -9,7 +9,7 @@ import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
 import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
-import { invoiceDescription, notesByStage } from "@/features/tickets/invoice";
+import { invoiceMemo } from "@/features/tickets/invoice";
 import { createInvoice, fetchInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
 import { resendTicketEmail, sendTicketEmail, statusUrl } from "@/features/mail/send";
 import type { EmailKind, TicketEmailData } from "@/features/mail/templates";
@@ -157,7 +157,7 @@ async function unparkOr(ticketNumber: string, stage: Step, answer: boolean | nul
   return { ok: false as const, error: "Your role doesn't own this step." };
 }
 
-/** The step's free text: inspection comments, parts list, what you did, test notes. Saved on blur. */
+/** The step's free text: inspection comments, parts list, what you did, test notes, the customer memo on Payment. Saved on blur. */
 export async function setStepNotes(ticketNumber: string, stage: Step, notes: string): Promise<ActionResult> {
   const parsed = stepEnum.safeParse(stage);
   if (!parsed.success) return { ok: false, error: "Unknown step." };
@@ -244,12 +244,11 @@ export async function reopenTicket(ticketNumber: string): Promise<ActionResult> 
  */
 /** Everything the four customer emails can mention, read fresh from the ticket. */
 async function emailData(t: Loaded, extra?: { url: string; amount: number; dueAt: string }): Promise<{ to: string; data: TicketEmailData } | null> {
-  const [{ data: ticket }, { data: steps }] = await Promise.all([
+  const [{ data: ticket }, { data: paymentStep }] = await Promise.all([
     t.supabase.from("tickets").select("customer_name, customer_email, watch, issue, ship_tracking, ship_carrier, needs_payment, payment_amount").eq("id", t.id).single(),
-    t.supabase.from("ticket_steps").select("stage, notes").eq("ticket_id", t.id).in("stage", ["inspect", "supply", "repair"]),
+    t.supabase.from("ticket_steps").select("notes").eq("ticket_id", t.id).eq("stage", "payment").maybeSingle(),
   ]);
   if (!ticket?.customer_email) return null;
-  const notes = notesByStage(steps ?? []);
   return {
     to: ticket.customer_email,
     data: {
@@ -257,9 +256,7 @@ async function emailData(t: Loaded, extra?: { url: string; amount: number; dueAt
       watch: ticket.watch,
       customerName: ticket.customer_name,
       issue: ticket.issue,
-      repairNotes: notes.repair,
-      inspectNotes: notes.inspect,
-      partsNotes: notes.supply,
+      memo: invoiceMemo(paymentStep?.notes),
       amount: extra?.amount ?? ticket.payment_amount,
       payUrl: extra?.url ?? null,
       dueAt: extra?.dueAt ?? null,
@@ -437,11 +434,12 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
   const t = await loadForStep(ticketNumber, "payment");
   if (!t.ok) return t;
   if (!stripeConfigured()) return { ok: false, error: "Stripe isn't set up on this server yet." };
-  const [{ data: ticket }, { data: steps }] = await Promise.all([
-    t.supabase.from("tickets").select("customer_name, customer_email, watch, issue, payment_amount, stripe_customer_id").eq("id", t.id).single(),
-    t.supabase.from("ticket_steps").select("stage, notes").eq("ticket_id", t.id).in("stage", ["inspect", "supply", "repair"]),
+  const [{ data: ticket }, { data: paymentStep }] = await Promise.all([
+    t.supabase.from("tickets").select("customer_name, customer_email, watch, payment_amount, stripe_customer_id").eq("id", t.id).single(),
+    t.supabase.from("ticket_steps").select("notes").eq("ticket_id", t.id).eq("stage", "payment").maybeSingle(),
   ]);
   if (!ticket) return { ok: false, error: "Ticket not found." };
+  const memo = invoiceMemo(paymentStep?.notes);
   if (!ticket.customer_email) return { ok: false, error: "The customer needs an email address first." };
   if (ticket.payment_amount == null || ticket.payment_amount <= 0) return { ok: false, error: "Enter the repair cost first." };
   // Step one: claim the ticket's one live invoice slot. The partial unique index
@@ -462,7 +460,7 @@ export async function sendInvoice(ticketNumber: string): Promise<ActionResult> {
   let created: Awaited<ReturnType<typeof createInvoice>>;
   try {
     customer ??= await findOrCreateCustomer(ticket.customer_name, ticket.customer_email);
-    created = await createInvoice(customer, ticket.payment_amount, invoiceDescription(t.number, ticket, steps ?? []), t.number);
+    created = await createInvoice(customer, ticket.payment_amount, `${ticket.watch} repair`, t.number, memo);
   } catch (e) {
     const reason = stripeError(e);
     await t.supabase.from("ticket_invoices").update({ status: "failed", error: reason, checked_at: new Date().toISOString() }).eq("id", row.id);

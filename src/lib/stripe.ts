@@ -30,18 +30,24 @@ export async function findOrCreateCustomer(name: string, email: string): Promise
 
 export type CreatedInvoice = { id: string; url: string; dueAt: string };
 
-/** Create, itemise and finalize an invoice the customer pays on Stripe's hosted page. */
-export async function createInvoice(customer: string, amount: number, description: string, ticketNumber: string): Promise<CreatedInvoice> {
+/**
+ * Create, itemise and finalize an invoice the customer pays on Stripe's
+ * hosted page. `lineItem` is the one line ("Retrospect repair"); `memo`
+ * is the customer-facing note from the Payment step, shown by Stripe as
+ * Memo on the pay page and PDF. The ticket number sits in the footer.
+ */
+export async function createInvoice(customer: string, amount: number, lineItem: string, ticketNumber: string, memo: string | null): Promise<CreatedInvoice> {
   const stripe = client();
   const inv = await stripe.invoices.create({
     customer,
     collection_method: "send_invoice",
     days_until_due: INVOICE_DAYS_UNTIL_DUE,
     auto_advance: false,
-    description: ticketNumber,
+    description: memo ?? ticketNumber,
+    footer: `Service ticket ${ticketNumber}`,
     metadata: { ticket: ticketNumber },
   });
-  await stripe.invoiceItems.create({ customer, invoice: inv.id, amount: Math.round(amount * 100), currency: "usd", description });
+  await stripe.invoiceItems.create({ customer, invoice: inv.id, amount: Math.round(amount * 100), currency: "usd", description: lineItem });
   const final = await stripe.invoices.finalizeInvoice(inv.id);
   if (!final.hosted_invoice_url) throw new Error("Stripe returned no payment link.");
   const due = final.due_date ? new Date(final.due_date * 1000) : new Date(Date.now() + INVOICE_DAYS_UNTIL_DUE * 86_400_000);

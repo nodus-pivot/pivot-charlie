@@ -21,11 +21,11 @@ describe("renderTicketEmail", () => {
   });
 
   it("invoice: amount, what it covers, pay button", () => {
-    const e = renderTicketEmail("invoice", { ...base, amount: 2, payUrl: "https://invoice.stripe.com/i/x", issue: "Bezel stuck", inspectNotes: "Grit under the insert", partsNotes: "1× Bezel insert\n1× Click spring", repairNotes: "Bezel replaced.", dueAt: "2026-10-31T12:00:00Z" });
+    const e = renderTicketEmail("invoice", { ...base, amount: 2, payUrl: "https://invoice.stripe.com/i/x", memo: "Replaced the bezel insert.\nCleaned and relubricated the bezel.", dueAt: "2026-10-31T12:00:00Z" });
     expect(e.subject).toBe("Payment request for your TrailTrekker repair — Ticket NW260022");
     expect(e.html).toContain("<strong>$2.00</strong>");
     expect(e.html).toContain("What this covers");
-    expect(e.text).toContain("Reported: Bezel stuck\nFound: Grit under the insert\nParts: 1× Bezel insert, 1× Click spring\nWork: Bezel replaced.");
+    expect(e.text).toContain("Replaced the bezel insert.\nCleaned and relubricated the bezel.");
     const bare = renderTicketEmail("invoice", { ...base, amount: 2, payUrl: "https://invoice.stripe.com/i/x" });
     expect(bare.html).not.toContain("What this covers");
     expect(e.html).toContain('href="https://invoice.stripe.com/i/x"');
