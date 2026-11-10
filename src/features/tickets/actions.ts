@@ -9,7 +9,7 @@ import { drainQuietly } from "@/features/intake/writebacks";
 import { countryField } from "@/features/intake/schema";
 import { photoPathBelongsTo } from "@/lib/photos";
 import { appUrl, mrkdwn, postSlack } from "@/lib/slack";
-import { invoiceDescription } from "@/features/tickets/invoice";
+import { invoiceDescription, notesByStage } from "@/features/tickets/invoice";
 import { createInvoice, fetchInvoice, findOrCreateCustomer, stripeConfigured, stripeError, voidStripeInvoice } from "@/lib/stripe";
 import { resendTicketEmail, sendTicketEmail, statusUrl } from "@/features/mail/send";
 import type { EmailKind, TicketEmailData } from "@/features/mail/templates";
@@ -244,11 +244,12 @@ export async function reopenTicket(ticketNumber: string): Promise<ActionResult> 
  */
 /** Everything the four customer emails can mention, read fresh from the ticket. */
 async function emailData(t: Loaded, extra?: { url: string; amount: number; dueAt: string }): Promise<{ to: string; data: TicketEmailData } | null> {
-  const [{ data: ticket }, { data: repair }] = await Promise.all([
+  const [{ data: ticket }, { data: steps }] = await Promise.all([
     t.supabase.from("tickets").select("customer_name, customer_email, watch, issue, ship_tracking, ship_carrier, needs_payment, payment_amount").eq("id", t.id).single(),
-    t.supabase.from("ticket_steps").select("notes").eq("ticket_id", t.id).eq("stage", "repair").maybeSingle(),
+    t.supabase.from("ticket_steps").select("stage, notes").eq("ticket_id", t.id).in("stage", ["inspect", "supply", "repair"]),
   ]);
   if (!ticket?.customer_email) return null;
+  const notes = notesByStage(steps ?? []);
   return {
     to: ticket.customer_email,
     data: {
@@ -256,7 +257,9 @@ async function emailData(t: Loaded, extra?: { url: string; amount: number; dueAt
       watch: ticket.watch,
       customerName: ticket.customer_name,
       issue: ticket.issue,
-      repairNotes: repair?.notes ?? null,
+      repairNotes: notes.repair,
+      inspectNotes: notes.inspect,
+      partsNotes: notes.supply,
       amount: extra?.amount ?? ticket.payment_amount,
       payUrl: extra?.url ?? null,
       dueAt: extra?.dueAt ?? null,

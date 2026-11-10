@@ -8,6 +8,8 @@
  * Images are referenced by cid and attached by the sender (see send.ts).
  */
 
+import { repairLines } from "@/features/tickets/invoice";
+
 export type EmailKind = "received" | "tested" | "invoice" | "shipped";
 
 export type TicketEmailData = {
@@ -16,8 +18,12 @@ export type TicketEmailData = {
   customerName: string;
   /** The customer's words at intake (received). */
   issue?: string | null;
-  /** The Repair step's "what you did" (invoice: "What this covers"). */
+  /** The Repair step's "what you did". With inspectNotes and partsNotes it builds the invoice's "What this covers". */
   repairNotes?: string | null;
+  /** The Inspect step's comments (invoice). */
+  inspectNotes?: string | null;
+  /** The Supply step's parts list (invoice). */
+  partsNotes?: string | null;
   amount?: number | null;
   payUrl?: string | null;
   dueAt?: string | null;
@@ -101,18 +107,20 @@ export function renderTicketEmail(kind: EmailKind, d: TicketEmailData): Rendered
           : "We’ll be in touch shortly with your tracking information once it ships. If you have any questions in the meantime, just reply to this email.",
         statusUrl: d.statusUrl,
       });
-    case "invoice":
+    case "invoice": {
+      const covers = repairLines(d.issue, { inspect: d.inspectNotes, supply: d.partsNotes, repair: d.repairNotes });
       return build({
         subject: `Payment request for your ${d.watch} repair — Ticket ${d.number}`,
         number: d.number,
         headline: `Payment needed for your ${d.watch}`,
         greeting: `Hi ${first},`,
         lead: [`Your repair comes to `, b(money), `. You can pay securely below and we’ll ship your `, d.watch, ` back right away.`, d.dueAt ? ` The link is good until ${longDate(d.dueAt)}.` : ""],
-        box: d.repairNotes?.trim() ? { label: "What this covers", text: clip(d.repairNotes.trim(), 300) } : null,
+        box: covers.length ? { label: "What this covers", text: covers.map((l) => clip(l, 200)).join("\n") } : null,
         button: d.payUrl ? { label: "Pay now  →", url: d.payUrl } : null,
         close: "Once paid, we’ll have it on its way to you and send your tracking information. If you have any questions in the meantime, just reply to this email.",
         statusUrl: d.statusUrl,
       });
+    }
     case "shipped": {
       const track = trackingUrl(d.carrier, d.tracking);
       const number = (d.tracking ?? "").trim();
@@ -158,7 +166,7 @@ function build(s: Spec): RenderedEmail {
   const leadText = s.lead.map((p) => (typeof p === "string" ? p : p.b)).join("");
 
   const boxHtml = s.box
-    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px"><tbody><tr><td style="background:#f8f8f6;border-left:3px solid #1a1a1a;padding:14px 18px"><div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#888;margin-bottom:6px">${esc(s.box.label)}</div><div style="font-size:${s.box.mono ? "15px;font-family:'SF Mono',Menlo,Consolas,monospace;letter-spacing:0.04em" : "13px"};color:#333;line-height:1.6">${esc(s.box.text)}</div></td></tr></tbody></table>`
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px"><tbody><tr><td style="background:#f8f8f6;border-left:3px solid #1a1a1a;padding:14px 18px"><div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#888;margin-bottom:6px">${esc(s.box.label)}</div><div style="font-size:${s.box.mono ? "15px;font-family:'SF Mono',Menlo,Consolas,monospace;letter-spacing:0.04em" : "13px"};color:#333;line-height:1.6;white-space:pre-line">${esc(s.box.text)}</div></td></tr></tbody></table>`
     : "";
   const stepsHtml = s.steps?.length
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px"><tbody><tr><td style="padding-bottom:10px"><div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#888;margin-bottom:14px">What happens next</div></td></tr>` +
