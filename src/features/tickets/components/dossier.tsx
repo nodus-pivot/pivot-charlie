@@ -85,7 +85,7 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
     });
   }
 
-  const coverageText = fields.coverage === "paid" ? "Out of warranty · paid" : "Warranty";
+  const coverageText = fields.coverage === "paid" ? "Out of warranty · billable" : "Warranty";
 
   return (
     <aside className="flex w-full flex-none flex-col border-b border-rule px-4 pb-8 pt-8 sm:px-8 lg:w-[380px] lg:border-b-0 lg:border-r lg:pl-12 lg:pr-9">
@@ -133,7 +133,7 @@ export function Dossier({ data, editable, canComment }: { data: DossierData; edi
         <Row label="Serial">
           {editable ? <Text value={fields.serial ?? ""} onChange={(v) => patch({ serial: v })} onBlur={() => save()} placeholder="Optional" mono /> : <Value mono muted={!data.serial}>{data.serial ?? "—"}</Value>}
         </Row>
-        <Row label="Coverage" trailing={editable ? <Segmented size="sm" value={fields.coverage} options={[{ value: "warranty", label: "Warranty" }, { value: "paid", label: "Paid" }]} onChange={(v) => { patch({ coverage: v }); save({ coverage: v }); }} aria-label="Coverage" /> : undefined}>
+        <Row label="Coverage" trailing={editable ? <Segmented size="sm" value={fields.coverage} options={[{ value: "warranty", label: "Warranty" }, { value: "paid", label: "Billable" }]} onChange={(v) => { patch({ coverage: v }); save({ coverage: v }); }} aria-label="Coverage" /> : undefined}>
           <Value>{coverageText}</Value>
         </Row>
         {data.received_at ? (

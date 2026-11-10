@@ -207,20 +207,20 @@ export function TicketForm({ draft, onPatch, brandId, context }: Props) {
             trailing={
               <Segmented
                 value={draft.coverage}
-                options={[{ value: "warranty", label: "Warranty" }, { value: "paid", label: "Paid" }]}
+                options={[{ value: "warranty", label: "Warranty" }, { value: "paid", label: "Billable" }]}
                 onChange={(v) => onPatch({ coverage: v, needsPayment: v === "paid" ? true : draft.needsPayment })}
                 aria-label="Coverage"
               />
             }
           >
             <span className="text-[17px] text-ink">
-              {draft.coverage === "paid" ? "Paid repair · adds the Payment step" : "Warranty"}
+              {draft.coverage === "paid" ? "Billable repair · adds the Payment step" : "Warranty"}
             </span>
-            {!sheet ? <span className="text-xs text-ink-3">Paid adds the Payment step before Ship</span> : null}
+            {!sheet ? <span className="text-xs text-ink-3">Billable adds the Payment step before Ship</span> : null}
             {sheet ? (
               <span className="text-xs text-ink-3">
                 Sheet says Payment Required = {sheet.fields.paymentRequired || "blank"}
-                {sheet.paymentAmount !== null ? ` · $${sheet.paymentAmount} in the issue text` : ""} · Paid adds the Payment step
+                {sheet.paymentAmount !== null ? ` · $${sheet.paymentAmount} in the issue text` : ""} · Billable adds the Payment step
               </span>
             ) : null}
           </FieldRow>

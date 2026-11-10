@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-/** Have it / Need it, Warranty / Paid, Fix / Replace: a 1px frame, the active segment lifted in gold. */
+/** Have it / Need it, Warranty / Billable, Fix / Replace: a 1px frame, the active segment lifted in gold. */
 export function Segmented<T extends string>({
   value,
   options,
